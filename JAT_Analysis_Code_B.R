@@ -250,7 +250,7 @@ alpha_result <- psych::alpha(likert_numeric, check.keys = TRUE)
 alpha_result$total$raw_alpha
 
 # Item statistics
-paste0(likert_cols, "_num") %>%
+df_likert <- paste0(likert_cols, "_num") %>%
   map_df(function(col_num) {
     tibble(
       item = str_remove(col_num, "_num"),
@@ -261,6 +261,8 @@ paste0(likert_cols, "_num") %>%
         100
     )
   })
+
+write_parquet(df_likert, "out/df_likert.parquet")
 
 # By State and Gender
 map(group_cols, function(group_col) {
@@ -278,7 +280,7 @@ map(group_cols, function(group_col) {
 # ============================================================================
 
 # Summarize qualitative results by group
-cualitative_df <-
+ls_qualitative <-
   map(names(text_cols), function(t_col) {
     map(group_cols, function(g_col) {
       suffix <- paste0("_", t_col)
@@ -293,6 +295,8 @@ cualitative_df <-
     })
   }) %>%
   set_names(names(text_cols))
+
+write_rds(ls_qualitative, "out/ls_qualitative.rds")
 
 # ============================================================================
 # END OF ANALYSIS
