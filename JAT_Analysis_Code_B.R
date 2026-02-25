@@ -13,11 +13,12 @@
 library(tidyverse)
 library(readxl)
 library(psych)
+library(arrow)
 
 # Define coding function
 code_responses <- function(text, keywords) {
   pattern <- paste(keywords, collapse = "|")
-  pattern_match <- as.numeric(str_detect(pattern, tolower(text)))
+  pattern_match <- as.numeric(grepl(pattern, tolower(text), perl = TRUE))
   return(pattern_match)
 }
 
@@ -101,6 +102,14 @@ text_categories <- list(
 
 text_cols = list("val" = "Mas_valioso", "skill" = "Habilidades")
 
+# Group columns
+group_cols <- list(
+  "General" = "General",
+  "Estado" = "Estado",
+  "Género" = "Sexo_label",
+  "Estado y género" = c("Estado", "Sexo_label")
+)
+
 # Load data
 df_raw <- read_excel("final_seguimiento_JAT_Jan_2026_-_anon.xlsx")
 
@@ -144,125 +153,11 @@ df_recode <- df_raw %>%
       select(., ends_with("_num"), -starts_with("L5")),
       na.rm = TRUE
     )
-  )
+  ) %>%
+  # Column for general grouping
+  mutate(General = "General")
 
-# ============================================================================
-# 2. DEMOGRAPHICS
-# ============================================================================
-
-# Total N
-cat("Total respondents:", nrow(df_recode), "\n")
-
-# Gender distribution
-table(df_recode$Sexo_label) %>%
-  prop.table(table(df_recode$Sexo_label)) *
-  100
-
-# State distribution
-table(df_recode$Estado)
-
-# Age statistics
-summary(df_recode$Edad)
-sd(df_recode$Edad, na.rm = TRUE)
-
-# Cross-tabulation: State x Gender
-table(df_recode$Estado, df_recode$Sexo_label)
-
-# Age by State and Gender
-df_recode %>%
-  group_by(Estado, Sexo_label) %>%
-  summarise(
-    mean_age = mean(Edad, na.rm = TRUE),
-    sd_age = sd(Edad, na.rm = TRUE),
-    n = n()
-  )
-
-# Education level
-table(df_recode$Nivel_estudios)
-
-# Occupational status by Gender
-table(df_recode$Estatus_ocupacional, df_recode$Sexo_label)
-
-# ============================================================================
-# 3. EDUCATIONAL TRAJECTORIES
-# ============================================================================
-
-# Overall continuation rate
-sum(df_recode$Continua_estudiando) / nrow(df_recode) * 100
-
-# By State and Gender
-list(
-  "Estado" = "Estado",
-  "Género" = "Sexo_label",
-  "Estado y género" = c("Estado", "Sexo_label")
-) %>%
-  map(function(group_col) {
-    df_recode %>%
-      group_by(across(group_col)) %>%
-      summarise(
-        n_studying = sum(Continua_estudiando),
-        n_total = n(),
-        pct = mean(Continua_estudiando) * 100
-      )
-    df_recode %>%
-      group_by(across(group_col)) %>% 
-      filter(Continua_estudiando == 1) %>%
-      count(Nivel_actual_estudios, name = "n_total") %>% 
-      mutate(pct = n_total / sum(n_total) * 100) 
-  })
-
-# Study levels among those currently studying
-df_recode %>%
-  filter(Continua_estudiando == 1) %>%
-  count(Nivel_actual_estudios)
-
-# ============================================================================
-# 4. LIKERT SCALE ANALYSIS
-# ============================================================================
-
-likert_numeric <- select(df_recode, ends_with("_num"))
-
-# Cronbach's Alpha
-alpha_result <- psych::alpha(likert_numeric, check.keys = TRUE)
-alpha_result$total$raw_alpha
-
-psych::describe(likert_numeric)
-
-# Item statistics
-paste0(likert_cols, "_num") %>%
-  map_df(function(col_num) {
-    tibble(
-      item = str_remove(col_num, "_num"),
-      mean = mean(df_recode[[col_num]], na.rm = TRUE),
-      sd = sd(df_recode[[col_num]], na.rm = TRUE),
-      p_positive = sum(df_recode[[col_num]] >= 3, na.rm = TRUE) /
-        sum(!is.na(df_recode[[col_num]]), na.rm = TRUE) *
-        100
-    )
-  })
-
-# By State
-df_recode %>%
-  group_by(Estado) %>%
-  summarise(
-    L1_mean = mean(L1_motivacion_estudiar_num, na.rm = TRUE),
-    L5_mean = mean(L5_obstaculos_superados_num, na.rm = TRUE),
-    Composite = mean(Likert_total, na.rm = TRUE)
-  )
-
-# By Gender
-df_recode %>%
-  group_by(Sexo_label) %>%
-  summarise(
-    L1_mean = mean(L1_motivacion_estudiar_num, na.rm = TRUE),
-    L5_mean = mean(L5_obstaculos_superados_num, na.rm = TRUE),
-    Composite = mean(Likert_total, na.rm = TRUE)
-  )
-
-# ============================================================================
-# 5. QUALITATIVE CONTENT ANALYSIS
-# ============================================================================
-
+# Dataframe for qualitative analysis
 text_df <- map(names(text_categories), function(cat_group) {
   category <- text_categories[[cat_group]]
   text_col_name <- text_cols[[cat_group]]
@@ -274,29 +169,130 @@ text_df <- map(names(text_categories), function(cat_group) {
 }) %>%
   reduce(bind_cols)
 
-df_recode <- bind_cols(text_df, df_recode)
+# Joint dataframe
+df_jat <- bind_cols(text_df, df_recode)
 
+# Write dataframe
+arrow::write_parquet(df_jat, "out/df_jat.parquet")
 
-# Skills categories
+# ============================================================================
+# 2. DEMOGRAPHICS
+# ============================================================================
+
+# Total N
+cat("Total respondents:", nrow(df_jat), "\n")
+
+# Gender distribution
+prop.table(table(df_jat$Sexo_label)) *
+  100
+
+# State distribution
+table(df_jat$Estado)
+
+# Age statistics
+summary(df_jat$Edad)
+sd(df_jat$Edad, na.rm = TRUE)
+
+# Cross-tabulation: State x Gender
+table(df_jat$Estado, df_jat$Sexo_label)
+
+# Age by State and Gender
+df_jat %>%
+  group_by(Estado, Sexo_label) %>%
+  summarise(
+    mean_age = mean(Edad, na.rm = TRUE),
+    sd_age = sd(Edad, na.rm = TRUE),
+    n = n()
+  )
+
+# Education level
+table(df_jat$Nivel_estudios)
+
+# Occupational status by Gender
+table(df_jat$Estatus_ocupacional, df_jat$Sexo_label)
+
+# ============================================================================
+# 3. EDUCATIONAL TRAJECTORIES
+# ============================================================================
+
+# Overall continuation rate
+sum(df_jat$Continua_estudiando) / nrow(df_jat) * 100
+
+# By State and Gender
+map(group_cols, function(group_col) {
+  df_jat %>%
+    group_by(across(group_col)) %>%
+    summarise(
+      n_studying = sum(Continua_estudiando),
+      n_total = n(),
+      pct = mean(Continua_estudiando) * 100
+    )
+  df_jat %>%
+    group_by(across(group_col)) %>%
+    filter(Continua_estudiando == 1) %>%
+    count(Nivel_actual_estudios, name = "n_total") %>%
+    mutate(pct = n_total / sum(n_total) * 100)
+})
+
+# Study levels among those currently studying
+df_jat %>%
+  filter(Continua_estudiando == 1) %>%
+  count(Nivel_actual_estudios)
+
+# ============================================================================
+# 4. LIKERT SCALE ANALYSIS
+# ============================================================================
+
+likert_numeric <- select(df_jat, ends_with("_num"))
+
+# Cronbach's Alpha
+alpha_result <- psych::alpha(likert_numeric, check.keys = TRUE)
+alpha_result$total$raw_alpha
+
+# Item statistics
+paste0(likert_cols, "_num") %>%
+  map_df(function(col_num) {
+    tibble(
+      item = str_remove(col_num, "_num"),
+      mean = mean(df_jat[[col_num]], na.rm = TRUE),
+      sd = sd(df_jat[[col_num]], na.rm = TRUE),
+      p_positive = sum(df_jat[[col_num]] >= 3, na.rm = TRUE) /
+        sum(!is.na(df_jat[[col_num]]), na.rm = TRUE) *
+        100
+    )
+  })
+
+# By State and Gender
+map(group_cols, function(group_col) {
+  df_jat %>%
+    group_by(across(group_col)) %>%
+    summarise(
+      L1_mean = mean(L1_motivacion_estudiar_num, na.rm = TRUE),
+      L5_mean = mean(L5_obstaculos_superados_num, na.rm = TRUE),
+      Composite = mean(Likert_total, na.rm = TRUE)
+    )
+})
+
+# ============================================================================
+# 5. QUALITATIVE CONTENT ANALYSIS
+# ============================================================================
 
 # Summarize qualitative results by group
-df_recode %>%
-  filter(!is.na(Mas_valioso)) %>%
-  group_by(Estado) %>%
-  summarise(
-    n = n(),
-    pct_amistades = mean(`val_Amistades/Relaciones`) * 100,
-    pct_mentitos = mean(`val_Mentitos/Mentoría`) * 100
-  )
-
-df_recode %>%
-  filter(!is.na(Habilidades)) %>%
-  group_by(Sexo_label) %>%
-  summarise(
-    n = n(),
-    pct_liderazgo = mean(skill_Liderazgo) * 100,
-    pct_comunicacion = mean(skill_Comunicación) * 100
-  )
+cualitative_df <-
+  map(names(text_cols), function(t_col) {
+    map(group_cols, function(g_col) {
+      suffix <- paste0("_", t_col)
+      df_jat %>%
+        filter(!is.na(t_col)) %>%
+        group_by(across(g_col)) %>%
+        summarise(
+          N = n(),
+          across(ends_with(suffix), ~ mean(.x, na.rm = TRUE) * 100)
+        ) %>%
+        ungroup()
+    })
+  }) %>%
+  set_names(names(text_cols))
 
 # ============================================================================
 # END OF ANALYSIS
