@@ -44,6 +44,13 @@ key_renames <- c(
   "L6_vision_proyecto_vida" = 44,
   "L7_integracion_espacios" = 45,
   "L8_responsabilidades_comunidad" = 46,
+  "componente_ayuda_01" = 54,
+  "componente_ayuda_02" = 55,
+  "componente_ayuda_03" = 56,
+  "componente_ayuda_04" = 57,
+  "componente_ayuda_05" = 58,
+  "componente_ayuda_06" = 60,
+  "componente_ayuda_07" = 61,
   "Expectativas_Red" = 63,
   "Mas_valioso" = 64,
   "Habilidades" = 65,
@@ -170,7 +177,7 @@ text_df <- map(names(text_categories), function(cat_group) {
   reduce(bind_cols)
 
 # Joint dataframe
-df_jat <- bind_cols(text_df, df_recode)
+df_jat <- bind_cols(df_recode, text_df)
 
 # Write dataframe
 arrow::write_parquet(df_jat, "out/df_jat.parquet")
@@ -297,6 +304,31 @@ ls_qualitative <-
   set_names(names(text_cols))
 
 write_rds(ls_qualitative, "out/ls_qualitative.rds")
+
+
+# ========
+# 6. Program components
+# ========
+
+df_components <-
+  df_jat %>%
+  mutate(responses = n()) %>%
+  select(c("respondent_id", "responses"), starts_with("componente_ayuda")) %>%
+  pivot_longer(
+    cols = starts_with("componente_ayuda"),
+    names_to = "name",
+    values_to = "componente"
+  ) %>%
+  select(-c("name")) %>%
+  na.omit() %>%
+  group_by(responses) %>%
+  count(componente, sort = TRUE) %>%
+  mutate(prop = n / responses * 100) %>%
+  ungroup() %>%
+  select(-c("responses")) %>%
+  rename("Componente" = 1, "Menciones" = 2, "Porcentaje de menciones" = 3)
+
+write_parquet(df_components, "out/df_components.parquet")
 
 # ============================================================================
 # END OF ANALYSIS
