@@ -44,13 +44,21 @@ key_renames <- c(
   "L6_vision_proyecto_vida" = 44,
   "L7_integracion_espacios" = 45,
   "L8_responsabilidades_comunidad" = 46,
+  "contacto_01" = 47,
+  "contacto_02" = 48,
+  "contacto_03" = 49,
+  "contacto_04" = 50,
+  "contacto_05" = 51,
+  "contacto_06" = 52,
+  "contacto_07" = 53,
   "componente_ayuda_01" = 54,
   "componente_ayuda_02" = 55,
   "componente_ayuda_03" = 56,
   "componente_ayuda_04" = 57,
   "componente_ayuda_05" = 58,
-  "componente_ayuda_06" = 60,
-  "componente_ayuda_07" = 61,
+  "componente_ayuda_06" = 59,
+  "componente_ayuda_07" = 60,
+  "componente_ayuda_08" = 61,
   "Expectativas_Red" = 63,
   "Mas_valioso" = 64,
   "Habilidades" = 65,
@@ -310,25 +318,43 @@ write_rds(ls_qualitative, "out/ls_qualitative.rds")
 # 6. Program components
 # ========
 
-df_components <-
+responses <- nrow(df_jat)
+
+df_components <- 
   df_jat %>%
-  mutate(responses = n()) %>%
-  select(c("respondent_id", "responses"), starts_with("componente_ayuda")) %>%
+  select(c("respondent_id"), starts_with("componente_ayuda")) %>%
   pivot_longer(
     cols = starts_with("componente_ayuda"),
     names_to = "name",
     values_to = "componente"
   ) %>%
-  select(-c("name")) %>%
   na.omit() %>%
-  group_by(responses) %>%
   count(componente, sort = TRUE) %>%
-  mutate(prop = n / responses * 100) %>%
-  ungroup() %>%
-  select(-c("responses")) %>%
+  mutate(prop = n / responses * 100) %>% 
   rename("Componente" = 1, "Menciones" = 2, "Porcentaje de menciones" = 3)
 
 write_parquet(df_components, "out/df_components.parquet")
+
+# ========
+# 7. Maintained contact
+# ========
+
+df_contact <- 
+  df_jat %>%
+  select(c("respondent_id"), starts_with("contacto")) %>%
+  mutate(contacto_07 = ifelse(is.na(contacto_07), contacto_07, "Con otros")) %>% 
+  pivot_longer(
+    cols = starts_with("contacto"),
+    names_to = "name",
+    values_to = "contacto"
+  ) %>%
+  na.omit() %>%
+  count(contacto, sort = TRUE) %>%
+  mutate(prop = n / responses * 100) %>% 
+  rename("Mantiene contacto" = 1, "Menciones" = 2, "Porcentaje de menciones" = 3)
+
+
+write_parquet(df_contact, "out/df_contact.parquet")
 
 # ============================================================================
 # END OF ANALYSIS

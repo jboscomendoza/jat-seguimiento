@@ -1,8 +1,8 @@
 ---
 title: "JAT: Reporte seguimiento"
 format: 
-    html:
-        df-print: kable
+  html:
+    df-print: kable
 engine: knitr
 execute: 
   echo: false
@@ -14,10 +14,13 @@ theme: journal
 library(tidyverse)
 library(arrow)
 library(psych)
+library(huxtable)
 
 df_jat <- read_parquet("out/df_jat.parquet")
 df_likert <- read_parquet("out/df_likert.parquet")
 ls_qualitative <- read_rds("out/ls_qualitative.rds")
+df_components <- read_parquet("out/df_components.parquet")
+df_contact <- read_parquet("out/df_contact.parquet")
 ```
 
 Total respondents: `r nrow(df_jat)`
@@ -95,14 +98,14 @@ map(group_cols, function(group_col) {
       L1_mean = mean(L1_motivacion_estudiar_num, na.rm = TRUE),
       L5_mean = mean(L5_obstaculos_superados_num, na.rm = TRUE),
       Composite = mean(Likert_total, na.rm = TRUE)
-    ) %>% 
-      knitr::kable()
+    ) %>%
+    knitr::kable()
 })
 ```
 
 ## Values
 ```{r Qualitative val general}
-ls_qualitative[["val"]][["General"]] %>% 
+ls_qualitative[["val"]][["General"]] %>%
   rename_with(~ str_remove(., "_val"), ends_with("val"))
 ```
 
@@ -141,4 +144,16 @@ ls_qualitative[["skill"]][["Género"]] %>%
 ```{r Qualitative skill state_gender}
 ls_qualitative[["skill"]][["Estado y género"]] %>%
   rename_with(~ str_remove(., "_skill"), ends_with("skill"))
+```
+
+## Components
+```{r Components}
+df_components %>% 
+  mutate(across(is.numeric, round, 2))
+```
+
+## Contact
+```{r Contact}
+df_contact %>% 
+  mutate(across(is.numeric, round, 2))
 ```
