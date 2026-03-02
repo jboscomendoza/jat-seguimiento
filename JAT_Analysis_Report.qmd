@@ -1,7 +1,7 @@
 ---
 title: "JAT: Reporte seguimiento"
 format: 
-  html:
+  docx:
     df-print: kable
 engine: knitr
 execute: 
@@ -14,13 +14,28 @@ theme: journal
 library(tidyverse)
 library(arrow)
 library(psych)
-library(huxtable)
 
-df_jat <- read_parquet("out/df_jat.parquet")
-df_likert <- read_parquet("out/df_likert.parquet")
+round_cols <- function(df_to_round) {
+  df_to_round %>%
+    mutate(across(where(is.numeric), ~round(., 1)))
+}
+
+df_jat <- read_parquet("out/df_jat.parquet") %>%
+  round_cols()
+df_likert <- read_parquet("out/df_likert.parquet") %>%
+  round_cols()
 ls_qualitative <- read_rds("out/ls_qualitative.rds")
-df_components <- read_parquet("out/df_components.parquet")
-df_contact <- read_parquet("out/df_contact.parquet")
+df_components <- read_parquet("out/df_components.parquet") %>%
+  round_cols()
+df_contact <- read_parquet("out/df_contact.parquet") %>%
+  round_cols()
+
+group_cols <- list(
+  "General" = "general",
+  "Estado" = "estado",
+  "Género" = "sexo",
+  "Estado y género" = c("estado", "sexo")
+)
 ```
 
 Total respondents: `r nrow(df_jat)`
@@ -29,8 +44,8 @@ Total respondents: `r nrow(df_jat)`
 
 ```{r Gender distribution}
 df_jat %>%
-  count(Sexo_label) %>%
-  mutate(prop = n / sum(n) * 100) %>%
+  count(sexo) %>%
+  mutate(prop = round(n / sum(n) * 100, 1)) %>%
   set_names(c("Género", "N", "%"))
 ```
 
@@ -38,8 +53,8 @@ df_jat %>%
 
 ```{r State distribution}
 df_jat %>%
-  count(Estado) %>%
-  mutate(prop = n / sum(n) * 100) %>%
+  count(estado) %>%
+  mutate(prop = round(n / sum(n) * 100, 1)) %>%
   set_names(c("Estado", "N", "%"))
 ```
 
@@ -47,23 +62,24 @@ df_jat %>%
 
 ```{r StatexGender distribution}
 df_jat %>%
-  count(Estado, Sexo_label) %>%
-  mutate(prop = n / sum(n) * 100) %>%
+  count(estado, sexo) %>%
+  group_by(estado) %>%
+  mutate(prop = round(n / sum(n) * 100, 1)) %>%
   set_names(c("Estado", "Género", "N", "%"))
 ```
 
 ## Age
 
 ```{r age}
-describe(df_jat["Edad"])
+describe(df_jat["edad"])
 ```
 
 ## Education level
 
 ```{r Education}
 df_jat %>%
-  count(Nivel_estudios) %>%
-  mutate(prop = n / sum(n) * 100) %>%
+  count(nivel_estudios, sort = TRUE) %>%
+  mutate(prop = round(n / sum(n) * 100, 1)) %>%
   set_names(c("Nivel de estudios", "N", "%"))
 ```
 
@@ -71,8 +87,8 @@ df_jat %>%
 
 ```{r Ocupation}
 df_jat %>%
-  count(Estatus_ocupacional, Sexo_label) %>%
-  mutate(prop = n / sum(n) * 100) %>%
+  count(estatus_ocupacional, sexo, sort = TRUE) %>%
+  mutate(prop = round(n / sum(n) * 100, 1)) %>%
   set_names(c("Nivel de estudios", "Género", "N", "%"))
 ```
 
@@ -84,21 +100,15 @@ df_likert
 
 ```{r}
 #| output: asis
-group_cols <- list(
-  "General" = "General",
-  "Estado" = "Estado",
-  "Género" = "Sexo_label",
-  "Estado y género" = c("Estado", "Sexo_label")
-)
-
 map(group_cols, function(group_col) {
   df_jat %>%
     group_by(across(group_col)) %>%
     summarise(
-      L1_mean = mean(L1_motivacion_estudiar_num, na.rm = TRUE),
-      L5_mean = mean(L5_obstaculos_superados_num, na.rm = TRUE),
-      Composite = mean(Likert_total, na.rm = TRUE)
+      L1_mean = mean(l1_motivacion_estudiar_num, na.rm = TRUE),
+      L5_mean = mean(l5_obstaculos_superados_num, na.rm = TRUE),
+      Composite = mean(likert_total, na.rm = TRUE)
     ) %>%
+    round_cols() %>%
     knitr::kable()
 })
 ```
@@ -106,54 +116,115 @@ map(group_cols, function(group_col) {
 ## Values
 ```{r Qualitative val general}
 ls_qualitative[["val"]][["General"]] %>%
-  rename_with(~ str_remove(., "_val"), ends_with("val"))
+  rename_with(~ str_remove(., "_val"), ends_with("val")) %>%
+  round_cols()
 ```
 
 ```{r Qualitative val state}
 ls_qualitative[["val"]][["Estado"]] %>%
-  rename_with(~ str_remove(., "_skill"), ends_with("val"))
+  rename_with(~ str_remove(., "_skill"), ends_with("val")) %>%
+  round_cols()
 ```
 
 ```{r Qualitative val gender}
 ls_qualitative[["val"]][["Género"]] %>%
-  rename_with(~ str_remove(., "_skill"), ends_with("val"))
+  rename_with(~ str_remove(., "_skill"), ends_with("val")) %>%
+  round_cols()
 ```
 
 ```{r Qualitative val state_gender}
 ls_qualitative[["val"]][["Estado y género"]] %>%
-  rename_with(~ str_remove(., "_skill"), ends_with("val"))
+  rename_with(~ str_remove(., "_skill"), ends_with("val")) %>%
+  round_cols()
 ```
 
 ## Skills
 ```{r Qualitative skill general}
 ls_qualitative[["skill"]][["General"]] %>%
-  rename_with(~ str_remove(., "_skill"), ends_with("skill"))
+  rename_with(~ str_remove(., "_skill"), ends_with("skill")) %>%
+  round_cols()
 ```
 
 
 ```{r Qualitative skill state}
 ls_qualitative[["skill"]][["Estado"]] %>%
-  rename_with(~ str_remove(., "_skill"), ends_with("skill"))
+  rename_with(~ str_remove(., "_skill"), ends_with("skill")) %>%
+  round_cols()
 ```
 
 ```{r Qualitative skill gender}
 ls_qualitative[["skill"]][["Género"]] %>%
-  rename_with(~ str_remove(., "_skill"), ends_with("skill"))
+  rename_with(~ str_remove(., "_skill"), ends_with("skill")) %>%
+  round_cols()
 ```
 
 ```{r Qualitative skill state_gender}
 ls_qualitative[["skill"]][["Estado y género"]] %>%
-  rename_with(~ str_remove(., "_skill"), ends_with("skill"))
+  rename_with(~ str_remove(., "_skill"), ends_with("skill")) %>%
+  round_cols()
 ```
 
 ## Components
 ```{r Components}
-df_components %>% 
-  mutate(across(is.numeric, round, 2))
+df_components %>%
+  round_cols()
 ```
 
 ## Contact
 ```{r Contact}
-df_contact %>% 
-  mutate(across(is.numeric, round, 2))
+df_contact %>%
+  round_cols()
+
+```
+
+## Positive experience
+```{r}
+df_jat %>%
+  select(respondent_id, matches("^L\\d.*?(_num)")) %>%
+  pivot_longer(cols = starts_with("L")) %>%
+  na.omit() %>%
+  mutate(positivo = value >= 3) %>%
+  group_by(name) %>%
+  count(positivo) %>%
+  mutate(prop = n / sum(n) * 100) %>%
+  filter(positivo) %>%
+  select(-positivo) %>%
+  round_cols()
+```
+
+```{r}
+df_jat %>%
+  select(respondent_id, sexo, matches("^L\\d.*?(_num)")) %>%
+  pivot_longer(cols = starts_with("L")) %>%
+  na.omit() %>%
+  mutate(positivo = value >= 3) %>%
+  group_by(name, sexo) %>%
+  count(positivo) %>%
+  mutate(prop = n / sum(n) * 100) %>%
+  filter(positivo) %>%
+  select(-positivo, -n) %>%
+  pivot_wider(names_from = sexo, values_from = prop) %>%
+  round_cols()
+```
+
+```{r}
+df_jat %>%
+  select(respondent_id, periodo, matches("^L\\d.*?(_num)")) %>%
+  pivot_longer(cols = starts_with("L")) %>%
+  na.omit() %>%
+  mutate(positivo = value >= 3) %>%
+  group_by(name, periodo) %>%
+  count(positivo) %>%
+  mutate(prop = n / sum(n) * 100) %>%
+  filter(positivo) %>%
+  select(-positivo, -n) %>%
+  pivot_wider(names_from = periodo, values_from = prop) %>%
+  round_cols()
+```
+
+
+## Classes
+```{r}
+df_jat %>% 
+  count(periodo)
 ```

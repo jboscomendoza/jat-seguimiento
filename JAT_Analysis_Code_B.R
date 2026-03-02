@@ -189,6 +189,9 @@ df_recode <- df_raw %>%
   # Generation
   mutate(generacion = coalesce(generacion_01, generacion_02, generacion_03, generacion_04)) %>% 
   select(-matches("^generacion.*?_")) %>% 
+  mutate(periodo = str_extract(generacion, "\\(.*") %>% 
+  str_remove_all("\\D") %>% str_replace("(^\\d{4})", "\\1-")) %>% 
+  mutate(periodo = ifelse(periodo == "", "Otro", periodo)) %>% 
   # Column for general grouping
   mutate(general = "General") %>% 
   select(
