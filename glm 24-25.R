@@ -136,12 +136,26 @@ model_formula <-
     "equipo",
     sep = " + "
   ) %>%
-  paste0("status ~ ", .) %>%
-  formula()
+  paste0("status ~ ", .)
 
 glm_model <- glm(
   formula = model_formula,
   data = lb_m_scores_wide,
+  family = binomial(link = 'logit')
+)
+
+glm_model <- glm(
+  formula = formula(model_formula),
+  data = lb_m_scores_wide,
+  family = binomial(link = 'logit')
+)
+
+glm_model_nl <- 
+  lb_m_scores_wide %>% 
+  filter(estado == "0_NL") %>% 
+  glm(
+  formula = formula(str_remove(model_formula, "\\+ estado ")),
+  data = .,
   family = binomial(link = 'logit')
 )
 
@@ -157,3 +171,4 @@ anova(glm_model)
 write_parquet(lb_m_scores, "out_glm/lb mentitos 24-25.parquet")
 write_parquet(lb_m_scores_wide, "out_glm/lb mentitos wide 24-25.parquet")
 write_rds(glm_model, "out_glm/glm 24-25.rds")
+write_rds(glm_model_nl, "out_glm/glm nl 24-25.rds")

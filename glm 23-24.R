@@ -11,7 +11,6 @@ if (!dir.exists("out_glm")) {
 
 lb_mentitos <- "abandono/LB mentitos 23-24.xlsx"
 lf_mentitos <- "abandono/LF mentitos 23-24.xlsx"
-lf_mentitos_ecatnl <- "abandono/LF mentitos 24-25 ecat-nl.xlsx"
 
 cols_names <- c(
   "id",
@@ -36,11 +35,7 @@ lf_m <- read_excel(lf_mentitos) %>%
   select(id, nombre, municipio) %>%
   mutate(id = paste0(id, str_to_lower(str_sub(nombre, 1, 3))))
 
-lf_m_ecatnl <- read_excel(lf_mentitos_ecatnl) %>%
-  select(id, nombre, municipio) %>%
-  mutate(id = paste0(id, str_to_lower(str_sub(nombre, 1, 3))))
-
-id_concluyo <- unique(c(lf_m$id, lf_m_ecatnl$id))
+id_concluyo <- unique(lf_m$id)
 
 # Processing ----
 
@@ -146,12 +141,20 @@ model_formula <-
     "equipo",
     sep = " + "
   ) %>%
-  paste0("status ~ ", .) %>%
-  formula()
+  paste0("status ~ ", .)
 
 glm_model <- glm(
   formula = model_formula,
   data = lb_m_scores_wide,
+  family = binomial(link = 'logit')
+)
+
+glm_model_nl <- 
+  lb_m_scores_wide %>% 
+  filter(estado == "0_NL") %>% 
+  glm(
+  formula = formula(str_remove(model_formula, "\\+ estado ")),
+  data = .,
   family = binomial(link = 'logit')
 )
 
@@ -167,3 +170,4 @@ anova(glm_model)
 write_parquet(lb_m_scores, "out_glm/lb mentitos 23-24.parquet")
 write_parquet(lb_m_scores_wide, "out_glm/lb mentitos wide 23-24.parquet")
 write_rds(glm_model, "out_glm/glm 23-24.rds")
+write_rds(glm_model_nl, "out_glm/glm nl 23-24.rds")
