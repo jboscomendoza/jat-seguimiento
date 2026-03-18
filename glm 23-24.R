@@ -47,12 +47,12 @@ lb_m <- lb_raw %>%
     ) %>%
       as.numeric("year") %>%
       round(),
+    edad = ifelse(edad == 99 | edad < 10, NA, edad),
     edad_cat = cut(edad, breaks = c(0, 11, 12, 13, 14, 15, 16, 99)),
   ) %>%
   mutate(
     id = paste0(id, str_to_lower(str_sub(nombre, 1, 3))),
     status = ifelse(id %in% id_concluyo, "Concluyó", "No concluyó"),
-    # edad = ifelse(edad == 99, NA, edad),
     # edad_cat = cut(edad, breaks = c(0, 11, 12, 13, 14, 15, 16, 99)),
     socioeco = ifelse(socioeco == 0, NA, socioeco),
     modelo_seguir = ifelse(str_detect(modelo_seguir, "Sí"), "Sí", "No"),

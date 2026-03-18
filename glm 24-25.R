@@ -10,6 +10,7 @@ if (!dir.exists("out_glm")) {
 }
 
 lb_mentitos <- "abandono/LB mentitos 24-25.xlsx"
+lb_360_mentitos <- "abandono/LB 360 mentitos 24-25.xlsx"
 lf_mentitos <- "abandono/LF mentitos 24-25.xlsx"
 lf_mentitos_ecatnl <- "abandono/LF mentitos 24-25 ecat-nl.xlsx"
 
@@ -28,9 +29,20 @@ cols_names <- c(
 cols_patron <- "^(liderazgo|empatia|decision|equipo)"
 na_pattern <- c("Prefiero no contestar", "No contestó")
 
+cols_360 <- c(
+  "id" = 11,
+  "nombre" = 12,
+  "estado" = 5
+)
+
+
 # Read ---
 lb_raw <- read_excel(lb_mentitos) %>%
   select(all_of(cols_names), matches(cols_patron))
+
+lb_360_raw <- 
+  read_excel(lb_360_mentitos) %>% 
+  select(all_of(cols_360), matches(cols_patron))
 
 lf_m <- read_excel(lf_mentitos) %>%
   select(id, nombre, municipio) %>%
@@ -70,6 +82,20 @@ lb_m <- lb_raw %>%
   select(-c(nombre)) %>%
   distinct(id, .keep_all = TRUE)
 
+lb_360_m <- 
+  lb_360_raw %>% 
+  mutate(
+    id = paste0(id, str_to_lower(str_sub(nombre, 1, 3))),
+    status = ifelse(id %in% id_concluyo, "Concluyó", "No concluyó"),
+    across(
+      where(is.character),
+      ~ ifelse(.x %in% na_pattern, NA_character_, .x)
+    ),
+  ) %>%
+  mutate() %>%
+  select(-c(nombre)) %>%
+  distinct(id, .keep_all = TRUE)
+
 # Scores ---
 lb_m_scores <- lb_m %>%
   pivot_longer(
@@ -89,6 +115,43 @@ lb_m_scores <- lb_m %>%
   select(-c("item", "response")) %>%
   distinct() %>%
   ungroup()
+
+lb_360_m_scores <- 
+  lb_360_m %>%
+  pivot_longer(
+    cols = matches(cols_patron),
+    names_to = "dim_item",
+    values_to = "response"
+  ) %>%
+  mutate(dim_item = str_replace(dim_item, "(\\d)", "_\\1")) %>%
+  separate_wider_delim(
+    cols = "dim_item",
+    delim = "_",
+    names = c("dim_360", "item_360"),
+    too_few = "align_start"
+  ) %>%
+  filter(!is.na(item_360)) %>% 
+  mutate(response = as.numeric(response)) %>%
+  group_by(id, dim_360) %>%
+  mutate(
+    dim_360 = paste0(dim_360, "_360"),
+    score_360 = sum(response, na.rm = TRUE)
+  ) %>%
+  select(-c("item_360", "response")) %>%
+  distinct() %>%
+  ungroup()
+
+lb_m_scores_united <- inner_join(
+  lb_m_scores,
+  select(lb_360_m_scores, -c("estado", "status")),
+  by = "id"
+)
+
+lb_360_m_scores_wide <- 
+  lb_360_m_scores %>% 
+  pivot_wider(names_from = "dim_360", values_from = "score_360") %>% 
+  select(-c("estado", "status")) %>% 
+  distinct()
 
 lb_m_scores_wide <-
   lb_m_scores %>%
@@ -118,7 +181,15 @@ lb_m_scores_wide <-
     all_of(c("liderazgo", "empatia", "decision", "equipo")),
     scale
   )) %>%
-  select(-c("id", "municipio"))
+  select(-c("municipio")) %>% 
+  distinct()
+
+lb_wide <- inner_join(
+  lb_m_scores_wide,
+  lb_360_m_scores_wide,
+  by = "id"
+) %>% 
+  select(-c("id"))
 
 # glm ----
 model_formula <-
@@ -138,20 +209,44 @@ model_formula <-
   ) %>%
   paste0("status ~ ", .)
 
+
+model_formula_360 <-
+  paste(
+    "sexo",
+    "I(edad-12)",
+    "estado",
+    "trabajo",
+    "nivel_educ",
+    "socioeco",
+    "modelo_seguir",
+    "liderazgo",
+    "empatia",
+    "decision",
+    "equipo",
+    "liderazgo_360",
+    "empatia_360",
+    "decision_360",
+    "equipo_360",
+    sep = " + "
+  ) %>%
+  paste0("status ~ ", .)
+
+
 glm_model <- glm(
   formula = model_formula,
-  data = lb_m_scores_wide,
+  data = lb_wide,
   family = binomial(link = 'logit')
 )
 
-glm_model <- glm(
-  formula = formula(model_formula),
-  data = lb_m_scores_wide,
+
+glm_model_360 <- glm(
+  formula = model_formula_360,
+  data = lb_wide,
   family = binomial(link = 'logit')
 )
 
 glm_model_nl <- 
-  lb_m_scores_wide %>% 
+  lb_wide %>% 
   filter(estado == "0_NL") %>% 
   glm(
   formula = formula(str_remove(model_formula, "\\+ estado ")),
@@ -159,13 +254,37 @@ glm_model_nl <-
   family = binomial(link = 'logit')
 )
 
+glm_model_nl_360 <- 
+  lb_wide %>% 
+  filter(estado == "0_NL") %>% 
+  glm(
+  formula = formula(str_remove(model_formula_360, "\\+ estado ")),
+  data = .,
+  family = binomial(link = 'logit')
+)
+
+
 broom::tidy(glm_model) %>%
   mutate(
     sig = ifelse(p.value <= 0.05, "*", ""),
     odds = exp(estimate),
   )
+
+broom::tidy(glm_model_360) %>%
+  mutate(
+    sig = ifelse(p.value <= 0.05, "*", ""),
+    odds = exp(estimate),
+  ) %>% View()
+
 summary(glm_model)
+summary(glm_model_360)
+summary(glm_model_nl)
+summary(glm_model_nl_360)
+
 anova(glm_model)
+anova(glm_model_360)
+anova(glm_model_nl)
+anova(glm_model_nl_360)
 
 # Exports
 write_parquet(lb_m_scores, "out_glm/lb mentitos 24-25.parquet")
