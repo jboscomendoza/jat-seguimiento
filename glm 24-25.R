@@ -1,8 +1,15 @@
-library(tidyverse)
-library(readxl)
-library(broom)
+# Setup ----
+# R >= 4.5
+# arrow >= 23.0.1.1
+# broom >= 1.0.12
+# lme4 >= 2.0-1
+# readxl >= 1.4.5
+# tidyverse >= 2.0.0
 library(arrow)
+library(broom)
 library(lme4)
+library(readxl)
+library(tidyverse)
 
 if (!dir.exists("out_glm")) {
   dir.create("out_glm")
@@ -10,8 +17,10 @@ if (!dir.exists("out_glm")) {
   message("out_glm already exists.")
 }
 
+# Variables ----
 lb_mentitos <- "abandono/LB mentitos 24-25.xlsx"
 lb_360_mentitos <- "abandono/LB 360 mentitos 24-25.xlsx"
+lb_mentores <- "abandono/LB mentores 24-25.xlsx"
 lf_mentitos <- "abandono/LF mentitos 24-25.xlsx"
 lf_mentitos_ecatnl <- "abandono/LF mentitos 24-25 ecat-nl.xlsx"
 
@@ -32,18 +41,26 @@ na_pattern <- c("Prefiero no contestar", "No contestó")
 
 cols_360 <- c(
   "id" = 11,
+  "id_mentor" = 7,
   "nombre" = 12,
   "estado" = 5
 )
 
+skills <- c("liderazgo", "empatia", "decision", "equipo")
 
-# Read ---
+# Read ----
 lb_raw <- read_excel(lb_mentitos) %>%
   select(all_of(cols_names), matches(cols_patron))
 
-lb_360_raw <- 
-  read_excel(lb_360_mentitos) %>% 
+lb_360_raw <-
+  read_excel(lb_360_mentitos) %>%
   select(all_of(cols_360), matches(cols_patron))
+
+lbm_raw <- read_excel(lb_mentores) %>%
+  select(
+    c("id_mentor" = "id", "nombre", "sexo_mentor" = "sexo"),
+    matches(cols_patron)
+  )
 
 lf_m <- read_excel(lf_mentitos) %>%
   select(id, nombre, municipio) %>%
@@ -83,8 +100,8 @@ lb_m <- lb_raw %>%
   select(-c(nombre)) %>%
   distinct(id, .keep_all = TRUE)
 
-lb_360_m <- 
-  lb_360_raw %>% 
+lb_360_m <-
+  lb_360_raw %>%
   mutate(
     id = paste0(id, str_to_lower(str_sub(nombre, 1, 3))),
     status = ifelse(id %in% id_concluyo, "Concluyó", "No concluyó"),
@@ -93,11 +110,27 @@ lb_360_m <-
       ~ ifelse(.x %in% na_pattern, NA_character_, .x)
     ),
   ) %>%
-  mutate() %>%
   select(-c(nombre)) %>%
   distinct(id, .keep_all = TRUE)
 
-# Scores ---
+lbm <-
+  lbm_raw %>%
+  mutate(
+    #id_mentor = paste0(id_mentor, str_to_lower(str_sub(nombre, 1, 3))),
+    sexo_mentor = ifelse(
+      sexo_mentor == "Otro (especifique)",
+      "Otro",
+      sexo_mentor
+    ),
+    across(
+      where(is.character),
+      ~ ifelse(.x %in% na_pattern, NA_character_, .x)
+    )
+  ) %>%
+  select(-c(nombre)) %>%
+  distinct(id_mentor, .keep_all = TRUE)
+
+# Scores ----
 lb_m_scores <- lb_m %>%
   pivot_longer(
     cols = matches(cols_patron),
@@ -117,7 +150,7 @@ lb_m_scores <- lb_m %>%
   distinct() %>%
   ungroup()
 
-lb_360_m_scores <- 
+lb_360_m_scores <-
   lb_360_m %>%
   pivot_longer(
     cols = matches(cols_patron),
@@ -131,7 +164,7 @@ lb_360_m_scores <-
     names = c("dim_360", "item_360"),
     too_few = "align_start"
   ) %>%
-  filter(!is.na(item_360)) %>% 
+  filter(!is.na(item_360)) %>%
   mutate(response = as.numeric(response)) %>%
   group_by(id, dim_360) %>%
   mutate(
@@ -142,19 +175,55 @@ lb_360_m_scores <-
   distinct() %>%
   ungroup()
 
-lb_m_scores_united <- inner_join(
-  lb_m_scores,
-  select(lb_360_m_scores, -c("estado", "status")),
-  by = "id"
-)
+lbm_scores <-
+  lbm %>%
+  pivot_longer(
+    cols = matches(cols_patron),
+    names_to = "dim_item",
+    values_to = "response"
+  ) %>%
+  mutate(dim_item = str_replace(dim_item, "(\\d)", "_\\1")) %>%
+  separate_wider_delim(
+    cols = "dim_item",
+    delim = "_",
+    names = c("dim_mentor", "item_mentor"),
+    too_few = "align_start"
+  ) %>%
+  filter(!is.na(item_mentor)) %>%
+  mutate(response = as.numeric(response)) %>%
+  group_by(id_mentor, dim_mentor) %>%
+  mutate(
+    dim_mentor = paste0(dim_mentor, "_mentor"),
+    score_mentor = sum(response, na.rm = TRUE)
+  ) %>%
+  select(-c("item_mentor", "response")) %>%
+  distinct() %>%
+  ungroup()
 
-lb_360_m_scores_wide <- 
-  lb_360_m_scores %>% 
-  pivot_wider(names_from = "dim_360", values_from = "score_360") %>% 
-  select(-c("estado", "status")) %>% 
-    mutate(across(where(is.numeric),
-    scale
-  )) %>% 
+
+lb_m_scores_united <-
+  lb_m_scores %>%
+  inner_join(
+    select(lb_360_m_scores, -c("estado", "status")),
+    by = "id"
+  ) %>%
+  inner_join(
+    lbm_scores,
+    by = "id_mentor"
+  )
+
+# Scores wide ----
+lb_360_m_scores_wide <-
+  lb_360_m_scores %>%
+  pivot_wider(names_from = "dim_360", values_from = "score_360") %>%
+  select(-c("estado", "status")) %>%
+  mutate(across(where(is.numeric), scale)) %>%
+  distinct()
+
+lbm_scores_wide <- 
+  lbm_scores %>%
+  pivot_wider(names_from = "dim_mentor", values_from = "score_mentor") %>%
+  mutate(across(where(is.numeric), scale)) %>%
   distinct()
 
 lb_m_scores_wide <-
@@ -182,61 +251,96 @@ lb_m_scores_wide <-
   ) %>%
   pivot_wider(names_from = "dim", values_from = "score") %>%
   mutate(across(
-    all_of(c("liderazgo", "empatia", "decision", "equipo", "socioeco")),
+    all_of(c(skills, "socioeco")),
     scale
   )) %>%
-  select(-c("municipio")) %>% 
+  select(-c("municipio")) %>%
   distinct()
 
 lb_wide <- inner_join(
   lb_m_scores_wide,
   lb_360_m_scores_wide,
   by = "id"
-) %>% 
-  select(-c("id"))
+) %>%
+  inner_join(
+    lbm_scores_wide,
+    by = "id_mentor"
+  ) %>% 
+  select(-c("id", "id_mentor"))
 
-# glm ----
-# Formulas
+# lm formulas ----
 model_formula <-
   paste(
-    "sexo",
-    "I(edad-12)",
-    "estado",
-    "trabajo",
-    "nivel_educ",
-    "socioeco",
-    "modelo_seguir",
-    "liderazgo",
-    "empatia",
-    "decision",
-    "equipo",
-    sep = " + "
+    c(
+      "sexo",
+      "I(edad-12)",
+      "estado",
+      "trabajo",
+      "nivel_educ",
+      "socioeco",
+      "modelo_seguir",
+      skills
+    ),
+    collapse = " + "
   ) %>%
   paste0("status ~ ", .)
 
 
 model_formula_360 <-
   paste(
-    "sexo",
-    "I(edad-12)",
-    "estado",
-    "trabajo",
-    "nivel_educ",
-    "socioeco",
-    "modelo_seguir",
-    "liderazgo",
-    "empatia",
-    "decision",
-    "equipo",
-    "liderazgo_360",
-    "empatia_360",
-    "decision_360",
-    "equipo_360",
-    sep = " + "
+    c(
+      "sexo",
+      "I(edad-12)",
+      "estado",
+      "trabajo",
+      "nivel_educ",
+      "socioeco",
+      "modelo_seguir",
+      skills,
+      paste0(skills, "_360")
+    ),
+    collapse = " + "
   ) %>%
   paste0("status ~ ", .)
 
-# Modelling ----
+model_formula_mentor <-
+  paste(
+    c(
+      "sexo",
+      "sexo_mentor",
+      "I(edad-12)",
+      "estado",
+      "trabajo",
+      "nivel_educ",
+      "socioeco",
+      "modelo_seguir",
+      skills,
+      paste0(skills, "_mentor")
+    ),
+    collapse = " + "
+  ) %>%
+  paste0("status ~ ", .)
+
+model_formula_global <-
+  paste(
+    c(
+      "sexo",
+      "sexo_mentor",
+      "I(edad-12)",
+      "estado",
+      "trabajo",
+      "nivel_educ",
+      "socioeco",
+      "modelo_seguir",
+      skills,
+      paste0(skills, "_360"),
+      paste0(skills, "_mentor")
+    ),
+    collapse = " + "
+  ) %>%
+  paste0("status ~ ", .)
+
+# glm fit ----
 glm_model <- glm(
   formula = model_formula,
   data = lb_wide,
@@ -249,46 +353,41 @@ glm_model_360 <- glm(
   family = binomial(link = 'logit')
 )
 
-glm_model_nl <- 
-  lb_wide %>% 
-  filter(estado == "0_NL") %>% 
+glm_model_nl <-
+  lb_wide %>%
+  filter(estado == "0_NL") %>%
   glm(
-  formula = str_remove(model_formula, "\\+ estado "),
-  data = .,
-  family = binomial(link = 'logit')
-)
-
-glm_model_nl_360 <- 
-  lb_wide %>% 
-  filter(estado == "0_NL") %>% 
-  glm(
-  formula = str_remove(model_formula_360, "\\+ estado "),
-  data = .,
-  family = binomial(link = 'logit')
-)
-
-
-broom::tidy(glm_model) %>%
-  mutate(
-    sig = ifelse(p.value <= 0.05, "*", ""),
-    odds = exp(estimate),
+    formula = str_remove(model_formula, "\\+ estado "),
+    data = .,
+    family = binomial(link = 'logit')
   )
 
-broom::tidy(glm_model_360) %>%
-  mutate(
-    sig = ifelse(p.value <= 0.05, "*", ""),
-    odds = exp(estimate),
-  ) %>% View()
+glm_model_nl_360 <-
+  lb_wide %>%
+  filter(estado == "0_NL") %>%
+  glm(
+    formula = str_remove(model_formula_360, "\\+ estado "),
+    data = .,
+    family = binomial(link = 'logit')
+  )
 
-summary(glm_model)
-summary(glm_model_360)
-summary(glm_model_nl)
-summary(glm_model_nl_360)
+glm_model_mentor <-
+  lb_wide %>%
+  glm(
+    formula = model_formula_mentor,
+    data = .,
+    family = binomial(link = 'logit')
+  )
 
-anova(glm_model, glm_model_360)
-anova(glm_model_nl, glm_model_nl_360)
+glm_model_global <-
+  lb_wide %>%
+  glm(
+    formula = model_formula_global,
+    data = .,
+    family = binomial(link = 'logit')
+  )
 
-# lme ---
+# lme fit ----
 hlm_model <- lme4::glmer(
   formula = str_replace(model_formula, "estado", "(1 + socioeco|estado)"),
   data = lb_wide,
@@ -303,12 +402,43 @@ hlm_model_360 <- lme4::glmer(
   control = lme4::glmerControl(optimizer = "bobyqa")
 )
 
+hlm_model_mentor <- lme4::glmer(
+  formula = str_replace(model_formula_mentor, "estado", "(1 + socioeco|estado)"),
+  data = lb_wide,
+  family = binomial(link = 'logit'),
+  control = lme4::glmerControl(optimizer = "bobyqa")
+)
+
+hlm_model_global <- lme4::glmer(
+  formula = str_replace(model_formula_global, "estado", "(1 + socioeco|estado)"),
+  data = lb_wide,
+  family = binomial(link = 'logit'),
+  control = lme4::glmerControl(optimizer = "bobyqa")
+)
+
+
+
+# Summary ----
+summary(glm_model)
+summary(glm_model_360)
+
+summary(glm_model_nl)
+summary(glm_model_nl_360)
+
+summary(glm_model_global)
+
 summary(hlm_model)
 summary(hlm_model_360)
-anova(hlm_model, hlm_model_360)
+summary(hlm_model_mentor)
+summary(hlm_model_global)
 
-# Exports
-write_parquet(lb_m_scores, "out_glm/lb mentitos 24-25.parquet")
-write_parquet(lb_m_scores_wide, "out_glm/lb mentitos wide 24-25.parquet")
+anova(glm_model, glm_model_nl, glm_model_nl_360)
+anova(glm_model, glm_model_mentor, glm_model_global)
+anova(hlm_model, hlm_model_global, hlm_model_360)
+
+# Exports ----
+write_parquet(lb_m_scores_united, "out_glm/lb mentitos 24-25.parquet")
+write_parquet(lb_wide, "out_glm/lb mentitos wide 24-25.parquet")
+
 write_rds(glm_model, "out_glm/glm 24-25.rds")
 write_rds(glm_model_nl, "out_glm/glm nl 24-25.rds")
