@@ -1,10 +1,14 @@
-library(tidyverse)
+# Setup ----
+# R >= 4.5
+# arrow >= 23.0.1.1
+# tidyverse >= 2.0.0
 library(arrow)
+library(tidyverse)
 
-lb_m_scores <- read_parquet("out_glm/lb mentitos 24-25.parquet")
+lb_scores <- read_parquet("out_glm/lb mentitos 24-25.parquet")
 
-# Plots ---
-lb_m_scores %>%
+# Plots ----
+lb_scores %>%
   filter(!is.na(municipio)) %>%
   ggplot() +
   aes(dim, score, fill = status, color = status) +
@@ -12,7 +16,7 @@ lb_m_scores %>%
   theme_bw() +
   theme(text = element_text(size = 16))
 
-lb_m_scores %>%
+lb_scores %>%
   filter(!is.na(municipio)) %>%
   ggplot() +
   aes(dim, score, fill = status, color = status) +
@@ -21,7 +25,7 @@ lb_m_scores %>%
   theme_bw() +
   theme(text = element_text(size = 16))
 
-lb_m_scores %>%
+lb_scores %>%
   filter(!is.na(municipio)) %>%
   ggplot() +
   aes(dim, score, fill = status, color = status) +
@@ -30,7 +34,7 @@ lb_m_scores %>%
   theme_bw() +
   theme(text = element_text(size = 16))
 
-lb_m_scores %>%
+lb_scores %>%
   filter(!is.na(edad)) %>%
   ggplot() +
   aes(dim, score, fill = status, color = status) +
@@ -39,7 +43,7 @@ lb_m_scores %>%
   theme_bw() +
   theme(text = element_text(size = 16))
 
-lb_m_scores %>%
+lb_scores %>%
   filter(!is.na(edad)) %>%
   ggplot() +
   aes(status, socioeco, fill = status, color = status) +
@@ -48,7 +52,7 @@ lb_m_scores %>%
   theme(text = element_text(size = 16))
 
 
-lb_m_scores %>%
+lb_scores %>%
   ggplot() +
   aes(socioeco, score, color = dim) +
   geom_point(alpha = .3, size = 1) +
@@ -56,7 +60,7 @@ lb_m_scores %>%
   facet_grid(dim ~ estado)
 
 # Summaries ----
-lb_m_scores %>%
+lb_scores %>%
   group_by(dim, status) %>%
   summarize(across(
     score,
@@ -64,7 +68,7 @@ lb_m_scores %>%
     .names = "{.col}_{.fn}"
   ))
 
-lb_m_scores %>%
+lb_scores %>%
   group_by(municipio, dim, status) %>%
   summarize(across(
     score,
@@ -72,7 +76,7 @@ lb_m_scores %>%
     .names = "{.col}_{.fn}"
   ))
 
-lb_m_scores %>%
+lb_scores %>%
   group_by(edad, dim, status) %>%
   summarize(across(
     score,
