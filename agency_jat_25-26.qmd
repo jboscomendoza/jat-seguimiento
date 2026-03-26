@@ -1,7 +1,12 @@
 ---
-title: "Agencia - Linea Base Mentores 25-26"
-format: 
-    html:
+title: "Agency - JAT - Base Mentores 25-26"
+format:
+    pdf:
+        df-print: kable
+        fig-format: png
+        out-widht: 80%
+        fig-dpi: 300 
+    docx:
         df-print: kable
         fig-format: png
         out-widht: 80%
@@ -24,8 +29,8 @@ to_round_tibble <- function(x_df, decimals = 2)
     mutate(across(where(is.numeric), ~ round(.x, decimals)))
 }
 
-item_stats <- read_rds("surveymonkey_25/item_stats.rds")
-item_irt <- read_rds("surveymonkey_25/item_irt.rds")
+item_stats <- read_rds("data/item_stats.rds")
+item_irt <- read_rds("data/item_irt.rds")
 
 irt_coefs <-
   map_df(item_irt, function(x) {
