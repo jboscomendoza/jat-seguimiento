@@ -1,7 +1,7 @@
 ---
 title: "JAT: Reporte seguimiento"
 format: 
-  docx:
+  html:
     df-print: kable
 engine: knitr
 execute: 
@@ -17,7 +17,7 @@ library(psych)
 
 round_cols <- function(df_to_round) {
   df_to_round %>%
-    mutate(across(where(is.numeric), ~round(., 1)))
+    mutate(across(where(is.numeric), ~ round(., 1)))
 }
 
 df_jat <- read_parquet("out/df_jat.parquet") %>%
@@ -34,7 +34,8 @@ group_cols <- list(
   "General" = "general",
   "Estado" = "estado",
   "Género" = "sexo",
-  "Estado y género" = c("estado", "sexo")
+  "Estado y género" = c("estado", "sexo"),
+  "Generación" = "periodo"
 )
 ```
 
@@ -43,6 +44,8 @@ Total respondents: `r nrow(df_jat)`
 ## Gender distribution
 
 ```{r Gender distribution}
+#| fig-width: 4
+#| fig-height: 8
 df_jat %>%
   count(sexo) %>%
   mutate(prop = round(n / sum(n) * 100, 1)) %>%
@@ -52,6 +55,8 @@ df_jat %>%
 ## State distribution
 
 ```{r State distribution}
+#| fig-width: 4
+#| fig-height: 8
 df_jat %>%
   count(estado) %>%
   mutate(prop = round(n / sum(n) * 100, 1)) %>%
@@ -96,6 +101,35 @@ df_jat %>%
 
 ```{r likert}
 df_likert
+```
+
+```{r}
+df_jat %>%
+  filter(periodo != "Otro") %>%
+  select(periodo, matches("l.*?_num")) %>%
+  group_by(periodo) %>%
+  summarise(across(where(is.numeric), ~ mean(., na.rm = TRUE))) %>%
+  pivot_longer(
+    cols = starts_with("l"),
+    names_to = "pregunta",
+    values_to = "promedio"
+  ) %>%
+  mutate(
+    pregunta = str_remove_all(pregunta, pattern = "l\\d_|_num") %>%
+      str_replace_all("_", " ") %>%
+      str_to_title()
+  ) %>%
+  ggplot() +
+  aes(periodo, promedio, color = pregunta) +
+  geom_hline(yintercept = 3, alpha = .3) +
+  geom_point() +
+  geom_line(aes(group = pregunta)) +
+  scale_x_discrete(guide = guide_axis(angle = 90)) +
+  labs(title = "Seguimiento de mentores", x = "Generación", y = "Puntaje promedio") +
+  facet_wrap(pregunta~.) +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "none")
+
 ```
 
 ```{r}
@@ -225,6 +259,59 @@ df_jat %>%
 
 ## Classes
 ```{r}
-df_jat %>% 
+df_jat %>%
   count(periodo)
+```
+
+
+```{r}
+sum(df_jat$continua_estudiando) / nrow(df_jat) * 100
+
+# By State and Gender
+map(group_cols, function(group_col) {
+  df_jat %>%
+    group_by(across(group_col)) %>%
+    summarise(
+      n_studying = sum(continua_estudiando),
+      n_total = n(),
+      pct = mean(continua_estudiando) * 100
+    )
+  df_jat %>%
+    group_by(across(all_of(group_col))) %>%
+    filter(continua_estudiando == 1) %>%
+    count(nivel_actual_estudios, name = "n_total") %>%
+    mutate(pct = n_total / sum(n_total) * 100)
+})
+
+# Study levels among those currently studying
+df_jat %>%
+  filter(continua_estudiando == 1) %>%
+  count(nivel_actual_estudios)
+
+#
+```
+
+## Participación red
+```{r}
+df_jat %>% 
+  count(participacion_red) %>% 
+  na.omit() %>% 
+  mutate(prop = round(n / sum(n) * 100, 2)) %>% 
+  set_names(c("Participación en la Red", "n", "%"))
+```
+
+
+```{r}
+responses <- nrow(df_jat)
+df_jat %>%
+  select(c("respondent_id", "participacion_red"), starts_with("contacto")) %>%
+  mutate(contacto_07 = ifelse(is.na(contacto_07), contacto_07, "Con otros")) %>%
+  pivot_longer(
+    cols = starts_with("contacto"),
+    names_to = "name",
+    values_to = "contacto"
+  ) %>%
+  na.omit() %>%
+  count(participacion_red, contacto, sort = TRUE) %>%
+  mutate(prop = round(n / responses * 100, 2))
 ```

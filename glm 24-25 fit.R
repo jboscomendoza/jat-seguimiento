@@ -13,6 +13,8 @@ library(lme4)
 # Data read ----
 lb_scores_wide <- read_parquet("out_glm/lb mentitos wide 24-25.parquet")
 
+skills <- c("liderazgo", "empatia", "decision", "equipo")
+
 # lm formulas ----
 model_formula <- paste(
   c(
@@ -180,11 +182,9 @@ summary(hlm_model_360)
 summary(hlm_model_mentor)
 summary(hlm_model_global)
 
-anova(glm_model, glm_model_360, glm_model_global)
 anova(glm_model_nl, glm_model_nl_360)
-anova(glm_model, glm_model_mentor, glm_model_global)
-anova(hlm_model_360, hlm_model_mentor, hlm_model_global)
-
+anova(glm_model, glm_model_360, glm_model_mentor, glm_model_global)
+anova(hlm_model, hlm_model_360, hlm_model_mentor, hlm_model_global)
 
 # Exports ----
 write_rds(glm_model, "out_glm/glm 24-25.rds")

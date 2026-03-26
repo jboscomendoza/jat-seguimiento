@@ -251,16 +251,14 @@ lb_mentores_scores_wide <-
   distinct()
 
 lb_scores_wide <- inner_join(
-  lb_mentitos_scores_wide,
+  lb_mentores_scores_wide,
   lb_mentitos_360_scores_wide,
-  by = "id"
-) %>%
+  by = "id_mentor"
+) %>% 
   inner_join(
-    lb_mentores_scores_wide,
-    by = "id_mentor"
-  ) %>%
-  select(-c("id", "id_mentor"))
-
+    lb_mentitos_scores_wide,
+    by = "id"
+  )
 # Export ----
 write_parquet(lb_scores, "out_glm/lb mentitos 24-25.parquet")
 write_parquet(lb_scores_wide, "out_glm/lb mentitos wide 24-25.parquet")
