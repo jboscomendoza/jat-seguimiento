@@ -1,4 +1,11 @@
 # Setup ----
+# R >= 4.5
+# arrow >= 23.0.1.1
+# janitor >= 2.2.1
+# mirt >= 1.45.1
+# readxl >= 1.4.5
+# tidyverse >= 2.0.0
+# Setup ----
 library(arrow)
 library(janitor)
 library(mirt)

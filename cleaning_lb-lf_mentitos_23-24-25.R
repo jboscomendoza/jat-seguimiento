@@ -14,7 +14,13 @@ if (!dir.exists("data/parquet")) {
 }
 
 # Variables ---
-cols_patron <- "^(liderazgo|empatia|decision|equipo)"
+cols_scales <-
+  c(
+    "liderazgo" = "liderazgo",
+    "empatia" = "empatia",
+    "decision" = "decision",
+    "equipo" = "equipo"
+  )
 
 na_pattern <- c("Prefiero no contestar", "No contestó")
 
@@ -76,7 +82,6 @@ data_raw <-
   map(function(x) {
     x %>%
       mutate(
-        status = ifelse(id %in% lb_24$concluye, "Concluyó", "No concluyó"),
         edad = ifelse(dplyr::between(edad, 10, 30), edad, NA),
         municipio = stringr::str_to_sentence(municipio),
         modelo_seguir = ifelse(
@@ -92,9 +97,9 @@ data_raw <-
         ),
       ) %>%
       mutate(
-        across(matches(cols_patron), as.numeric)
+        across(starts_with(cols_scales), as.numeric)
       ) %>%
-      select(-any_of(cols_remove)) %>% 
+      select(-any_of(cols_remove)) %>%
       distinct(id, .keep_all = TRUE)
   })
 
@@ -105,8 +110,19 @@ data_raw[["lf_mentitos_24-25"]] <- bind_rows(
 
 data_raw <- purrr::discard_at(data_raw, "lf_mentitos_24-25_ecatnl")
 
+# Scales ----
+data_scales <- map(data_raw, function(x_df) {
+  map_df(cols_scales, function(x_col) {
+    x_df %>% 
+      select(starts_with(x_col)) %>% 
+      rowSums(na.rm = TRUE)
+  })
+})
+
 # Export ----
-map(names(data_raw), function(x) {
-  path_export = paste0("data/parquet/", x, ".parquet")
-  write_parquet(data_raw[[x]], path_export)
+data_export <- map2(data_raw, data_scales, bind_cols)
+
+map(names(data_export), function(x_name) {
+  path_export = paste0("data/parquet/", x_name, ".parquet")
+  write_parquet(data_export[[x_name]], path_export)
 })
