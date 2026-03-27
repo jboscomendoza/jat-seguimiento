@@ -47,3 +47,10 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Quarto temp files
+*_files/
+*.html
+
+# VSCode
+.vscode

@@ -5,16 +5,16 @@ library(mirt)
 library(readxl)
 library(tidyverse)
 
-if (!dir.exists("surveymonkey_25")) {
-  dir.create("surveymonkey_25")
+if (!dir.exists("data/parquet")) {
+  dir.create("data/parquet", recursive = TRUE)
 } else {
-  message("surveymonkey_25 already exists")
+  message("data/parquet already exists")
 }
 
-if (!dir.exists("parquet")) {
-  dir.create("parquet")
+if (!dir.exists("output/psychometrics")) {
+  dir.create("output/psychometrics", recursive = TRUE)
 } else {
-  message("parquet already exists")
+  message("output/psychometrics already exists")
 }
 
 # funs and variables ----
@@ -87,9 +87,9 @@ cols_person_name <-
   )
 
 # reading and cleaning ----
-path_lb_mentores_25 <- "surveymonkey/Línea Base Mentores JAT 25-26.xlsx"
-path_lb_mentitos_25_online <- "surveymonkey/Online Línea Base adolescentes secundaria JAT 2025-2026.xlsx"
-path_lb_mentitos_25_vaciado <- "surveymonkey/Vaciado Línea Base adolescentes secundaria JAT 2025-2026.xlsx"
+path_lb_mentores_25 <- "data/surveymonkey_2025/Línea Base Mentores JAT 25-26.xlsx"
+path_lb_mentitos_25_online <- "data/surveymonkey_2025/Online Línea Base adolescentes secundaria JAT 2025-2026.xlsx"
+path_lb_mentitos_25_vaciado <- "data/surveymonkey_2025/Vaciado Línea Base adolescentes secundaria JAT 2025-2026.xlsx"
 
 header_top_mentores <- names(read_excel(path_lb_mentores_25, n_max = 1))
 header_bot_mentores <- names(read_excel(
@@ -211,7 +211,7 @@ lb_mentitos_25_export <- bind_cols(lb_mentitos_25, lb_mentitos_25_scales) %>%
   select(-any_of(cols_remove), -any_of(cols_person_name))
 
 # analysis ----
-item_stats <-
+item_stats_mentores_25 <-
   map(scale_names, function(x) {
     col_pattern <- paste0("^", x)
     item_cols <- select(lb_mentores_25_scales, matches(col_pattern))
@@ -221,7 +221,7 @@ item_stats <-
   }) %>%
   set_names(scale_names)
 
-item_irt <-
+item_irt_mentores_25 <-
   map(scale_names, function(x) {
     col_pattern <- paste0("^", x)
     item_cols <- select(lb_mentores_25_scales, matches(col_pattern))
@@ -233,7 +233,7 @@ item_irt <-
   set_names(scale_names)
 
 # Plots -----
-plot_scores <- map_df(item_irt, "scores") %>%
+plot_scores <- map_df(item_irt_mentores_25, "scores") %>%
   mutate(id = row_number()) %>%
   pivot_longer(-c("id"), names_to = "scale", values_to = "score") %>%
   ggplot() +
@@ -245,14 +245,14 @@ plot_scores <- map_df(item_irt, "scores") %>%
   theme_bw() +
   theme(legend.position = "none")
 
-irt_coefs <-
-  map_df(item_irt, function(x) {
+irt_coefs_mentores_25 <-
+  map_df(item_irt_mentores_25, function(x) {
     coef(x$modelo, simplify = TRUE)$items %>%
       as.data.frame() %>%
       rownames_to_column("item")
   })
 
-plot_coefs <- irt_coefs %>%
+plot_coefs <- irt_coefs_mentores_25 %>%
   filter(str_detect(item, "agencia")) %>%
   pivot_longer(
     cols = starts_with("b"),
@@ -268,16 +268,16 @@ plot_coefs <- irt_coefs %>%
   coord_flip()
 
 scale_cors <-
-  map_df(item_stats, "scores") %>%
+  map_df(item_stats_mentores_25, "scores") %>%
   cor() %>%
   as.data.frame() %>%
   rownames_to_column("scale") %>%
   as_tibble()
 
 # export ----
+write_parquet(lb_mentores_25_export, "data/parquet/lb_mentores_25-26.parquet")
+write_parquet(lb_mentitos_25_export, "data/parquet/lb_mentitos_25-26.parquet")
 
-write_parquet(lb_mentores_25_export, "parquet/lb_mentores_25.parquet")
-write_parquet(lb_mentitos_25_export, "parquet/lb_mentitos_25.parquet")
-
-write_rds(item_stats, "surveymonkey_25/item_stats.rds")
-write_rds(item_irt, "surveymonkey_25/item_irt.rds")
+write_rds(item_stats_mentores_25, "output/psychometrics/lb_mentores_25-26_item_stats.rds")
+write_rds(item_irt_mentores_25, "output/psychometrics/lb_mentores_25-26_item_irt.rds")
+write_rds(irt_coefs_mentores_25, "output/psychometrics/lb_mentores_25-26_irt_coefs.parquet")
