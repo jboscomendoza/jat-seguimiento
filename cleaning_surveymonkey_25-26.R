@@ -69,7 +69,6 @@ cols_remove <- c(
   "date_modified",
   "ip_address",
   "email_address",
-  "ip_address",
   "municipio_donde_vives",
   "colonia_donde_vives_solo_aplica_a_nl",
   "celular_10_digitos",
