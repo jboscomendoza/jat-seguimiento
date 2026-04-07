@@ -58,7 +58,8 @@ cols_to_text <- c(
   "empleo",
   "trabajo",
   "materias",
-  "celular"
+  "celular",
+  "eval_expectativas"
 )
 
 cols_to_numeric <- c(
@@ -78,7 +79,8 @@ data_paths <- list(
   "lb_mentitos_22-23" = "data/excel/LB mentitos 22-23.xlsx",
   "lf_mentitos_21-22_ch" = "data/excel/LF mentitos 21-22 ch.xlsx",
   "lf_mentitos_21-22_nl" = "data/excel/LF mentitos 21-22 nl.xlsx",
-  "lf_mentitos_22-23" = "data/excel/LF mentitos 22-23.xlsx"
+  "lf_mentitos_22-23" = "data/excel/LF mentitos 22-23.xlsx",
+  "lf_mentitos_22-23_vaciado" = "data/excel/LF mentitos 22-23 vaciado.xlsx"
 )
 
 data_raw <-
@@ -120,13 +122,19 @@ data_raw[["lf_mentitos_21-22"]] <- bind_rows(
   data_raw[["lf_mentitos_21-22_ch"]]
 )
 
+data_raw[["lf_mentitos_22-23"]] <- bind_rows(
+  data_raw[["lf_mentitos_22-23"]],
+  data_raw[["lf_mentitos_22-23_vaciado"]]
+)
+
 data_raw <- purrr::discard_at(
   data_raw,
   c(
     "lb_mentitos_21-22_nl",
     "lb_mentitos_21-22_ch",
     "lf_mentitos_21-22_nl",
-    "lf_mentitos_21-22_ch"
+    "lf_mentitos_21-22_ch",
+    "lf_mentitos_22-23_vaciado"
   )
 )
 

@@ -114,7 +114,7 @@ mentitos_24_hlm <- lme4::glmer(
 
 mentitos_both_glm <- glm(
   formula = paste0(model_formula, "+ periodo"),
-  data = model_formula,
+  data = lb_mentitos_both,
   family = binomial(link = 'logit')
 )
 
