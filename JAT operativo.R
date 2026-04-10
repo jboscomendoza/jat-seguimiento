@@ -1,12 +1,19 @@
 library(tidyverse)
 library(readxl)
 library(janitor)
+library(gt)
 
 # Setup ----
 if (!dir.exists("output/plots_graduacion/")) {
   dir.create("output/plots_graduacion/", recursive = TRUE)
 } else {
   message("output/plots_graduacion/ already exists.")
+}
+
+if (!dir.exists("output/docs_graduacion/")) {
+  dir.create("output/docs_graduacion/", recursive = TRUE)
+} else {
+  message("output/docs_graduacion/ already exists.")
 }
 
 # Variables and funs ----
@@ -70,6 +77,50 @@ jat_ment <-
     status = stringr::str_to_sentence(status),
     conteo = ifelse(conteo == 0, NA, conteo)
   )
+
+
+jat_ment %>%
+  select(-c("estado")) %>%
+  group_by(grupo, ciclo) %>%
+  mutate(
+    n = sum(conteo, na.rm = TRUE),
+    porcentaje = conteo / sum(conteo, na.rm = TRUE)
+  ) %>%
+  filter(!is.na(conteo)) %>%
+  ggplot() +
+  aes(ciclo, porcentaje, fill = status) %>%
+    geom_col(position = "stack") +
+  facet_wrap("grupo")
+
+jat_ment %>%
+  group_by(estado, grupo, ciclo) %>%
+  mutate(
+    n = sum(conteo, na.rm = TRUE),
+    porcentaje = conteo / sum(conteo, na.rm = TRUE)
+  ) %>%
+  filter(!is.na(conteo) & status == "Graduados") %>%
+  select(-c("status", "conteo", "n")) %>%
+  arrange(grupo, ciclo, estado) %>%
+  pivot_wider(names_from = "ciclo", values_from = "porcentaje") %>%
+  gt(omit_na_group = TRUE, groupname_col = "grupo", rowname_col = "estado") %>%
+  gt::tab_header("Porcentaje de participantes graduados") %>%
+  gt::tab_spanner(
+    label = "Ciclo",
+    columns = matches("^\\d")
+  ) %>%
+  gt::fmt_percent(decimals = 1) %>% 
+  gt::sub_missing(
+    columns = everything(),
+    rows = everything(),
+    missing_text = ""
+  ) %>% 
+  gt::summary_rows(
+    fns = list(
+      list(label = "Promedio", fn = "mean")
+    ),
+    fmt = ~ fmt_percent(., decimals = 1)
+  ) %>% 
+  gt::gtsave("output/docs_graduacion/graduacion_participantes.docx")
 
 # Plots mentores-mentitos ----
 plot_ment(jat_ment, "Mentores")
