@@ -140,3 +140,21 @@ ggsave(
   height = 11,
   scale = 1.5,
 )
+
+# Beneficiarios ----
+jat_clean %>% 
+  filter(beneficiarios == "Beneficiarios indirectos") %>% 
+  group_by(indicador, ciclo, estado) %>% 
+  mutate(conteo = sum(conteo)) %>% 
+  mutate(
+    indicador = ifelse(str_detect(indicador, "Beneficiarios"), "Beneficiarios intencionados", indicador)
+  ) %>% 
+  filter(conteo != 0) %>% 
+  select(-beneficiarios) %>% 
+  ggplot() +
+  aes(ciclo, conteo, fill = indicador) +
+  geom_col() +
+  geom_text(aes(label = conteo), position = position_stack(vjust = .5)) +
+  facet_grid(rows = vars(estado), scales = "free_y") +
+  theme_bw()
+

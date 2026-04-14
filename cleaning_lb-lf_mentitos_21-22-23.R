@@ -50,7 +50,9 @@ cols_remove <- c(
   "apellido2",
   "celular",
   "correo",
-  "curp"
+  "curp",
+  "first_name",
+  "last_name"
 )
 
 cols_to_text <- c(
@@ -67,7 +69,7 @@ cols_to_numeric <- c(
   "promedio"
 )
 
-entidades <- c(
+estados <- c(
   "nuevo león",
   "chihuahua",
   "ecatepec"
@@ -86,9 +88,9 @@ data_paths <- list(
 data_raw <-
   map(data_paths, function(x_path) {
     if (stringr::str_detect(x_path, "22-23")) {
-      map_df(entidades, function(ent) {
-        path_df <- read_excel(x_path, sheet = ent) %>%
-          mutate(entidad = ent) %>%
+      map_df(estados, function(est) {
+        path_df <- read_excel(x_path, sheet = est) %>%
+          mutate(estado = est) %>%
           mutate(
             across(any_of(cols_to_text), as.character),
             across(starts_with(cols_to_numeric), as.numeric)
