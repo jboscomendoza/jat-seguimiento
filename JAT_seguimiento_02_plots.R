@@ -91,7 +91,7 @@ df_jat %>%
   geom_text(aes(label = porcentaje), position = position_stack(vjust = .5)) +
   scale_fill_manual(
     name = "Estudios actuales",
-    values = c("#98f5e1", "#90dbf4", "#cfbaf0", "pink")
+    values = c("#f2bac9", "#f2e2ba", "#b0f2b4", "#bad7f2")
   ) +
   labs(x = "Ciclo", y = "Porcentaje") +
   facet_grid(rows = vars(estatus_ocupacional)) +
@@ -137,7 +137,7 @@ df_jat %>%
   geom_text(aes(label = porcentaje), position = position_stack(vjust = .5)) +
   scale_fill_manual(
     name = "Estudios actuales",
-    values = c("#98f5e1", "#90dbf4", "#cfbaf0", "pink")
+    values = c("#f2bac9", "#f2e2ba", "#b0f2b4", "#bad7f2")
   ) +
   labs(x = "Ciclo", y = "Porcentaje") +
   facet_grid(rows = vars(estatus_ocupacional), cols = vars(sexo)) +
@@ -151,4 +151,39 @@ ggsave(
   "output/seguimiento/mentores_estatus_educativo_sexo.png",
   width = 8,
   height = 6
+)
+
+
+df_jat %>%
+  filter(periodo != "Otro") %>%
+  select(periodo, matches("l.*?_num")) %>%
+  group_by(periodo) %>%
+  summarise(across(where(is.numeric), ~ mean(., na.rm = TRUE))) %>%
+  pivot_longer(
+    cols = starts_with("l"),
+    names_to = "pregunta",
+    values_to = "promedio"
+  ) %>%
+  mutate(
+    pregunta = str_remove_all(pregunta, pattern = "l\\d_|_num") %>%
+      str_replace_all("_", " ") %>%
+      str_to_title()
+  ) %>%
+  ggplot() +
+  aes(periodo, promedio, color = pregunta) +
+  geom_hline(yintercept = 3, alpha = .3) +
+  geom_point() +
+  geom_line(aes(group = pregunta)) +
+  scale_x_discrete(guide = guide_axis(angle = 90)) +
+  labs(x = "Ciclo", y = "Puntaje promedio") +
+  facet_wrap(pregunta~.) +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "none")
+ggsave(
+  filename = "output/plots_seguimiento/mentores_escalas.png",
+  units = "cm",
+  width = 16,
+  height = 13,
+  scale = 1.3,
+  dpi = 150
 )

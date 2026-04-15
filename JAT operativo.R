@@ -28,8 +28,8 @@ plot_ment <- function(df_ment, grupo_ment) {
     geom_col(position = "stack") +
     geom_text(aes(label = conteo), position = position_stack(vjust = .5)) +
     scale_fill_manual(name = "Estatus", values = color_pair) +
-    labs(x = "Ciclo", y = "Conteo") +
-    facet_grid(rows = vars(estado), axes = "all_x") +
+    labs(title = grupo_ment, x = "Ciclo", y = "Conteo") +
+    facet_grid(rows = vars(estado_lab), axes = "all_x") +
     theme_bw() +
     theme(
       legend.position = "top",
@@ -76,6 +76,24 @@ jat_ment <-
   mutate(
     status = stringr::str_to_sentence(status),
     conteo = ifelse(conteo == 0, NA, conteo)
+  ) %>%
+  mutate(
+    estado_lab = case_when(
+      estado == "Chihuahua" ~ "Chihuahua\n(1 sede)",
+      estado == "Estado de México" ~ "Estado de México\n(1 sede)",
+      estado == "Nuevo León" ~ "Nuevo León\n(3 sedes)",
+      estado == "Tamaulipas" ~ "Tamaulipas\n(1 sede)"
+    ),
+    estado_lab = factor(
+      estado_lab,
+      ordered = TRUE,
+      levels = c(
+        "Nuevo León\n(3 sedes)",
+        "Chihuahua\n(1 sede)",
+        "Estado de México\n(1 sede)",
+        "Tamaulipas\n(1 sede)"
+      )
+    )
   )
 
 
@@ -108,18 +126,18 @@ jat_ment %>%
     label = "Ciclo",
     columns = matches("^\\d")
   ) %>%
-  gt::fmt_percent(decimals = 1) %>% 
+  gt::fmt_percent(decimals = 1) %>%
   gt::sub_missing(
     columns = everything(),
     rows = everything(),
     missing_text = ""
-  ) %>% 
+  ) %>%
   gt::summary_rows(
     fns = list(
       list(label = "Promedio", fn = "mean")
     ),
     fmt = ~ fmt_percent(., decimals = 1)
-  ) %>% 
+  ) %>%
   gt::gtsave("output/docs_graduacion/graduacion_participantes.docx")
 
 # Plots mentores-mentitos ----
@@ -127,34 +145,39 @@ plot_ment(jat_ment, "Mentores")
 ggsave(
   filename = "output/plots_graduacion/mentores_operativo.png",
   units = "cm",
-  width = 11,
-  height = 11,
-  scale = 1.5,
+  width = 12,
+  height = 12,
+  scale = 1.3,
+  dpi = 150
 )
 
 plot_ment(jat_ment, "Mentitos")
 ggsave(
   filename = "output/plots_graduacion/mentitos_operativo.png",
   units = "cm",
-  width = 11,
-  height = 11,
-  scale = 1.5,
+  width = 12,
+  height = 12,
+  scale = 1.3,
+  dpi = 150
 )
 
 # Beneficiarios ----
-jat_clean %>% 
-  filter(beneficiarios == "Beneficiarios indirectos") %>% 
-  group_by(indicador, ciclo, estado) %>% 
-  mutate(conteo = sum(conteo)) %>% 
+jat_clean %>%
+  filter(beneficiarios == "Beneficiarios indirectos") %>%
+  group_by(indicador, ciclo, estado) %>%
+  mutate(conteo = sum(conteo)) %>%
   mutate(
-    indicador = ifelse(str_detect(indicador, "Beneficiarios"), "Beneficiarios intencionados", indicador)
-  ) %>% 
-  filter(conteo != 0) %>% 
-  select(-beneficiarios) %>% 
+    indicador = ifelse(
+      str_detect(indicador, "Beneficiarios"),
+      "Beneficiarios intencionados",
+      indicador
+    )
+  ) %>%
+  filter(conteo != 0) %>%
+  select(-beneficiarios) %>%
   ggplot() +
   aes(ciclo, conteo, fill = indicador) +
   geom_col() +
   geom_text(aes(label = conteo), position = position_stack(vjust = .5)) +
   facet_grid(rows = vars(estado), scales = "free_y") +
   theme_bw()
-
