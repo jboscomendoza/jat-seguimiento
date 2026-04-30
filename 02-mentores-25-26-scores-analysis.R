@@ -2,6 +2,16 @@ library(mirt)
 library(readxl)
 library(tidyverse)
 
+# Setup ----
+output_path <- "output/mentores 25-26"
+
+if (!dir.exists(output_path)) {
+    dir.create(output_path, recursive = TRUE)
+} else {
+    message(paste0(output_path, " already exists."))
+}
+
+# Vars ----
 path_lb <- "data/excel/LB mentores 25-26.xlsx"
 path_lf <- "data/excel/LF mentores 25-26.xlsx"
 
@@ -11,7 +21,7 @@ lb <- readxl::read_excel(path_lf) %>%
 lf <- readxl::read_excel(path_lf) %>%
     janitor::clean_names()
 
-lf_cats <- 
+lf_cats <-
     lf %>%
     select(
         "respondent_id",
@@ -19,9 +29,10 @@ lf_cats <-
         "sexo" = "q7_sexo",
         "estado" = "q11_estado_donde_vives",
         "sede" = "q12_selecciona_tu_sede",
-    )
+    ) %>%
+    mutate("nacional" = "Nacional")
 
-
+# Functions ----
 recode_answer <- function(wide_question) {
     recoded_answer <- wide_question %>%
         mutate(
@@ -99,6 +110,26 @@ get_itemstats <- function(wide_question) {
     return(question_itemstats)
 }
 
+scale_summary <- function(scale_df, data_cats, group) {
+    label = unique(scale_df[["scale"]])
+    df_cats <- inner_join(data_cats, scale_df, by = "respondent_id")
+    number_of_items <- length(unique(df_cats$number))
+
+    df_summary <- df_cats %>%
+        summarise(
+            mean = mean(answer),
+            sd = sd(answer),
+            n = n() / number_of_items,
+            .by = c(group)
+        ) %>%
+        arrange(.data[[group]]) %>%
+        mutate(scale = label) %>%
+        select(all_of("scale"), everything())
+    names(df_summary) <- stringr::str_to_title(names(df_summary))
+    return(df_summary)
+}
+
+# Analysis ----
 agnc_1 <- widen_question("q14", "Agency", 5)
 agnc_2 <- widen_question("q15", "Agency", 5)
 team <- widen_question("q29", "Teamwork", 9)
@@ -111,9 +142,42 @@ agnc <-
     mutate(number = as.character(as.numeric(number) + 5)) %>%
     bind_rows(agnc_1) %>%
     arrange(respondent_id, number)
-
 agnc_itemstats <- get_itemstats(agnc)
 team_itemstats <- get_itemstats(team)
 lead_itemstats <- get_itemstats(lead)
 empt_itemstats <- get_itemstats(empt)
 
+itemstats_list <- list(
+    "agnc" = agnc_itemstats,
+    "team" = team_itemstats,
+    "lead" = lead_itemstats,
+    "empt" = empt_itemstats
+)
+
+scale_list <- list(
+    "agnc" = agnc,
+    "team" = team,
+    "lead" = lead,
+    "empt" = empt
+)
+
+group_list <- list(
+    "nacional" = "nacional",
+    "edad" = "edad",
+    "estado" = "estado",
+    "sede" = "sede"
+)
+
+scale_summaries <-
+    map(scale_list, function(scale_x) {
+        map(group_list, function(group_x) {
+            scale_summary(scale_x, lf_cats, group_x)
+        })
+    })
+
+# Export ----
+write_rds(scale_list, paste0(output_path, "/lf-scales-mentores-25-26.rds"))
+write_rds(
+    scale_summaries,
+    paste0(output_path, "/lf-statistics-mentores-25-26.rds")
+)
