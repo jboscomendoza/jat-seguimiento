@@ -1,0 +1,63 @@
+---
+title: "Scales - JAT - Línea Final Mentores 25-26"
+format:
+    pdf:
+        df-print: kable
+        fig-format: png
+        out-widht: 80%
+        fig-dpi: 300 
+engine: knitr
+execute: 
+  echo: false
+  warning: false
+theme: journal
+---
+
+```{r setup}
+library(tidyverse)
+list_scale <- read_rds("output/mentores 25-26/lf-psychometrics-mentores-25-26.rds")
+list_stats  <- read_rds("output/mentores 25-26/lf-statistics-mentores-25-26.rds")
+```
+
+## Agency 
+
+```{r}
+list_stats[["agnc"]][["nacional"]]
+list_stats[["agnc"]][["edad"]]
+list_stats[["agnc"]][["estado"]]
+list_stats[["agnc"]][["sede"]] %>% filter(Sede != "-")
+list_scale[["agnc"]]
+```
+{{< pagebreak >}}
+
+## Teamwork
+
+```{r}
+list_stats[["team"]][["nacional"]]
+list_stats[["team"]][["edad"]]
+list_stats[["team"]][["estado"]]
+list_stats[["team"]][["sede"]] %>% filter(Sede != "-")
+list_scale[["team"]]
+```
+{{< pagebreak >}}
+
+## Leadership
+
+```{r}
+list_stats[["lead"]][["nacional"]]
+list_stats[["lead"]][["edad"]]
+list_stats[["lead"]][["estado"]]
+list_stats[["lead"]][["sede"]] %>% filter(Sede != "-")
+list_scale[["lead"]]
+```
+{{< pagebreak >}}
+
+## Empathy
+
+```{r}
+list_stats[["empt"]][["nacional"]]
+list_stats[["empt"]][["edad"]]
+list_stats[["empt"]][["estado"]]
+list_stats[["empt"]][["sede"]] %>% filter(Sede != "-")
+list_scale[["empt"]]
+```

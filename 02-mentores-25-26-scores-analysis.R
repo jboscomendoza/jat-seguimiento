@@ -98,15 +98,34 @@ get_itemstats <- function(wide_question) {
         question_stats$itemstats,
         question_stats$proportions
     ) %>%
-        mutate(alpha = alpha_value) %>%
+        mutate(
+    alpha = alpha_value,
+            across(where(is.numeric), ~ round(.x, 2)),
+        ) %>%
         rownames_to_column("item") %>%
         as_tibble() %>%
         rename(
-            "prop_1" = "1",
-            "prop_2" = "2",
-            "prop_3" = "3",
-            "prop_4" = "4"
-        )
+            "total_r" = "total.r",
+            "r_if_rm" = "total.r_if_rm",
+            "p_1" = "1",
+            "p_2" = "2",
+            "p_3" = "3",
+            "p_4" = "4"
+        ) %>%
+        select(all_of(c(
+            "item",
+            "N",
+            "mean",
+            "sd",
+            "alpha",
+            "alpha_if_rm",
+            "total_r",
+            "r_if_rm",
+            "p_1",
+            "p_2",
+            "p_3",
+            "p_4"
+        )))
     return(question_itemstats)
 }
 
@@ -123,7 +142,10 @@ scale_summary <- function(scale_df, data_cats, group) {
             .by = c(group)
         ) %>%
         arrange(.data[[group]]) %>%
-        mutate(scale = label) %>%
+        mutate(
+            across(where(is.numeric), ~ round(.x, 2)),
+            scale = label
+        ) %>%
         select(all_of("scale"), everything())
     names(df_summary) <- stringr::str_to_title(names(df_summary))
     return(df_summary)
@@ -177,6 +199,10 @@ scale_summaries <-
 
 # Export ----
 write_rds(scale_list, paste0(output_path, "/lf-scales-mentores-25-26.rds"))
+write_rds(
+    itemstats_list,
+    paste0(output_path, "/lf-psychometrics-mentores-25-26.rds")
+)
 write_rds(
     scale_summaries,
     paste0(output_path, "/lf-statistics-mentores-25-26.rds")
