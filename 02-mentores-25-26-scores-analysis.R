@@ -14,6 +14,8 @@ if (!dir.exists(output_path)) {
 # Vars ----
 path_lb <- "data/excel/LB mentores 25-26.xlsx"
 path_lf <- "data/excel/LF mentores 25-26.xlsx"
+path_lb_csv <- "data/excel/LB-Mentores-JAT-25-26.csv"
+path_lf_csv <- "data/excel/LF-Mentores-JAT-25-26.csv"
 
 lb <- readxl::read_excel(path_lb) %>%
     janitor::clean_names() %>%
@@ -21,6 +23,28 @@ lb <- readxl::read_excel(path_lb) %>%
 
 lf <- readxl::read_excel(path_lf) %>%
     janitor::clean_names()
+
+lb_decision <- readr::read_csv(path_lb_csv) %>%
+    janitor::clean_names() %>%
+    select("respondent_id", 68:76)
+
+lf_decision <- readr::read_csv(path_lb_csv) %>%
+    janitor::clean_names() %>%
+    filter(
+        stringr::str_length(correo_electronico) > 3 &
+            stringr::str_detect(correo_electronico, "Prueba", negate = TRUE) &
+            stringr::str_detect(
+                nombre_completo_apellido_1,
+                "Prueba",
+                negate = TRUE
+            )
+    ) %>%
+    filter(
+        !is.na(
+            selecciona_la_opcion_que_mejor_te_representa_en_cada_enunciado_me_gusta_considerar_todas_las_alternativas_antes_de_tomar_una_decision
+        )
+    ) %>%
+    select("respondent_id", 68:76)
 
 lb_cats <-
     lb %>%
@@ -63,53 +87,53 @@ items_to_reverse <- c(
 )
 
 reemplazos_nombres <- tibble(
-        from = c(
-            "Aidee Joselin Quiajda Dominguez",
-            "Allisson Fernanda Garcia Castro",
-            "Analia Galicia Serrano",
-            "Angel Morin Villarreal",
-            "Christian Abdiel Jaramillo Medellin.",
-            "Devany Lizath Zuniga Arriaga",
-            "Yosgard Garcia Hernandez",
-            "Vanesa Chavez Juarez",
-            "Gerardo Martinez Vallejo",
-            "Lidia Fernandez Marquez",
-            "Luz Anayetzy Orgaz Diaz Diaz",
-            "Citlali Antonio Hernandez",
-            "Dayra Natividad Leos",
-            "Karen Viri Hernandez",
-            "Maria De Jesus Martinez Martinez",
-            "Ricardo Martinez Martinez",
-            "Santiago Escamilla Araujo",
-            "Sarahi Robledo Iracheta",
-            "Darynka Martinez Gonzalez",
-            "Dulce Julian Mendez",
-            "Ricardo Martinez Canamar"
-        ),
-        to = c(
-            "Aidee Joselin Quijada Dominguez",
-            "Allison Fernanda Garcia Castro",
-            "Analia Rubi Galicia Serrano",
-            "Angel Enrique Morin Villarreal",
-            "Christian Abdiel Jaramillo Medellin",
-            "Devany Lizeth Zuniga Arriaga",
-            "Yosgard Said Garcia Hernandez",
-            "Vanesa Gabriela Chavez Juarez",
-            "Gerardo Israel Martinez Vallejo",
-            "Lidia Viridiana Fernandez Marquez",
-            "Luz Anayetzy Orgaz Diaz",
-            "Citlali Magdale Antonio Hernandez",
-            "Dayra Astrid Natividad Leos",
-            "Karen Viridiana Sandoval Hernandez",
-            "Maria De Jesus Martinez Escamilla",
-            "Ricardo Martinez Canamar",
-            "Alexander Santiago Escamilla Araujo",
-            "Maria Sarahi Robledo Iracheta",
-            "Isis Darynka Martinez Gonzalez",
-            "Dulce Silvana Julian Mendez",
-            "Oliver Ricardo Martinez Canamar"
-        )
+    from = c(
+        "Aidee Joselin Quiajda Dominguez",
+        "Allisson Fernanda Garcia Castro",
+        "Analia Galicia Serrano",
+        "Angel Morin Villarreal",
+        "Christian Abdiel Jaramillo Medellin.",
+        "Devany Lizath Zuniga Arriaga",
+        "Yosgard Garcia Hernandez",
+        "Vanesa Chavez Juarez",
+        "Gerardo Martinez Vallejo",
+        "Lidia Fernandez Marquez",
+        "Luz Anayetzy Orgaz Diaz Diaz",
+        "Citlali Antonio Hernandez",
+        "Dayra Natividad Leos",
+        "Karen Viri Hernandez",
+        "Maria De Jesus Martinez Martinez",
+        "Ricardo Martinez Martinez",
+        "Santiago Escamilla Araujo",
+        "Sarahi Robledo Iracheta",
+        "Darynka Martinez Gonzalez",
+        "Dulce Julian Mendez",
+        "Ricardo Martinez Canamar"
+    ),
+    to = c(
+        "Aidee Joselin Quijada Dominguez",
+        "Allison Fernanda Garcia Castro",
+        "Analia Rubi Galicia Serrano",
+        "Angel Enrique Morin Villarreal",
+        "Christian Abdiel Jaramillo Medellin",
+        "Devany Lizeth Zuniga Arriaga",
+        "Yosgard Said Garcia Hernandez",
+        "Vanesa Gabriela Chavez Juarez",
+        "Gerardo Israel Martinez Vallejo",
+        "Lidia Viridiana Fernandez Marquez",
+        "Luz Anayetzy Orgaz Diaz",
+        "Citlali Magdale Antonio Hernandez",
+        "Dayra Astrid Natividad Leos",
+        "Karen Viridiana Sandoval Hernandez",
+        "Maria De Jesus Martinez Escamilla",
+        "Ricardo Martinez Canamar",
+        "Alexander Santiago Escamilla Araujo",
+        "Maria Sarahi Robledo Iracheta",
+        "Isis Darynka Martinez Gonzalez",
+        "Dulce Silvana Julian Mendez",
+        "Oliver Ricardo Martinez Canamar"
     )
+)
 
 
 # Functions ----
@@ -170,6 +194,38 @@ widen_question <- function(
         ) %>%
         recode_answer()
     return(wide_question)
+}
+
+get_decision <- function(decision_df) {
+    decision_wide <- decision_df %>%
+        set_names(c(
+            "respondent_id",
+            paste0(names(lb_decision[2:10]), "|", 1:9)
+        )) %>%
+        pivot_longer(
+            cols = 2:10,
+            names_to = "question",
+            values_to = "answer"
+        ) %>%
+        mutate(
+            respondent_id = as.character(respondent_id),
+            question = stringr::str_remove(
+                question,
+                "selecciona_la_opcion_que_mejor_te_representa_en_cada_enunciado_"
+            ) %>%
+                stringr::str_replace_all("_", " ") %>%
+                stringr::str_squish() %>%
+                stringr::str_to_sentence()
+        ) %>%
+        tidyr::separate_wider_delim(
+            cols = "question",
+            names = c("question", "number"),
+            delim = "|"
+        ) %>%
+        recode_answer() %>%
+        mutate(scale = "Decision") %>%
+        select(c("respondent_id", "scale", "number", "question", "answer"))
+    return(decision_wide)
 }
 
 get_itemstats <- function(wide_question) {
@@ -247,14 +303,15 @@ lb_ag_2 <- widen_question(lb, "q14", "Agency", 5)
 lb_team <- widen_question(lb, "q21", "Teamwork", 9)
 lb_lead <- widen_question(lb, "q22", "Leadership", 7)
 lb_empt <- widen_question(lb, "q23", "Empathy", 5)
-#widen_question("q24", "Decision", 9)
+lb_dcsn <- get_decision(lb_decision)
+
 
 lf_ag_1 <- widen_question(lf, "q14", "Agency", 5)
 lf_ag_2 <- widen_question(lf, "q15", "Agency", 5)
 lf_team <- widen_question(lf, "q29", "Teamwork", 9)
 lf_lead <- widen_question(lf, "q30", "Leadership", 7)
 lf_empt <- widen_question(lf, "q31", "Empathy", 5)
-#widen_question("q32", "Decision", 9)
+lf_dcsn <- get_decision(lf_decision)
 
 lb_agnc <-
     lb_ag_2 %>%
@@ -265,6 +322,7 @@ lb_agnc_itemstats <- get_itemstats(lb_agnc)
 lb_team_itemstats <- get_itemstats(lb_team)
 lb_lead_itemstats <- get_itemstats(lb_lead)
 lb_empt_itemstats <- get_itemstats(lb_empt)
+lb_dcsn_itemstats <- get_itemstats(lb_dcsn)
 
 lf_agnc <-
     lf_ag_2 %>%
@@ -275,34 +333,39 @@ lf_agnc_itemstats <- get_itemstats(lf_agnc)
 lf_team_itemstats <- get_itemstats(lf_team)
 lf_lead_itemstats <- get_itemstats(lf_lead)
 lf_empt_itemstats <- get_itemstats(lf_empt)
+lf_dcsn_itemstats <- get_itemstats(lf_dcsn)
 
 # Grouped
 lb_itemstats_list <- list(
     "agnc" = lb_agnc_itemstats,
     "team" = lb_team_itemstats,
     "lead" = lb_lead_itemstats,
-    "empt" = lb_empt_itemstats
+    "empt" = lb_empt_itemstats,
+    "dcsn" = lb_dcsn_itemstats
 )
 
 lb_scale_list <- list(
     "agnc" = lb_agnc,
     "team" = lb_team,
     "lead" = lb_lead,
-    "empt" = lb_empt
+    "empt" = lb_empt,
+    "dcsn" = lb_dcsn
 )
 
 lf_itemstats_list <- list(
     "agnc" = lf_agnc_itemstats,
     "team" = lf_team_itemstats,
     "lead" = lf_lead_itemstats,
-    "empt" = lf_empt_itemstats
+    "empt" = lf_empt_itemstats,
+    "dcsn" = lb_dcsn_itemstats
 )
 
 lf_scale_list <- list(
     "agnc" = lf_agnc,
     "team" = lf_team,
     "lead" = lf_lead,
-    "empt" = lf_empt
+    "empt" = lf_empt,
+    "dcsn" = lf_dcsn
 )
 
 lb_scale_summaries <-
@@ -320,23 +383,23 @@ lf_scale_summaries <-
     })
 
 # Export ----
-write_rds(scale_list, paste0(output_path, "/lb-scales-mentores-25-26.rds"))
+write_rds(lb_scale_list, paste0(output_path, "/lb-scales-mentores-25-26.rds"))
 write_rds(
-    itemstats_list,
+    lb_itemstats_list,
     paste0(output_path, "/lb-psychometrics-mentores-25-26.rds")
 )
 write_rds(
-    scale_summaries,
+    lb_scale_summaries,
     paste0(output_path, "/lb-statistics-mentores-25-26.rds")
 )
 
 
-write_rds(scale_list, paste0(output_path, "/lf-scales-mentores-25-26.rds"))
+write_rds(lf_scale_list, paste0(output_path, "/lf-scales-mentores-25-26.rds"))
 write_rds(
-    itemstats_list,
+    lf_itemstats_list,
     paste0(output_path, "/lf-psychometrics-mentores-25-26.rds")
 )
 write_rds(
-    scale_summaries,
+    lf_scale_summaries,
     paste0(output_path, "/lf-statistics-mentores-25-26.rds")
 )
