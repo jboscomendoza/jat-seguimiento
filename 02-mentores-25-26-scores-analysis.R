@@ -26,9 +26,22 @@ lf <- readxl::read_excel(path_lf) %>%
 
 lb_decision <- readr::read_csv(path_lb_csv) %>%
     janitor::clean_names() %>%
+    filter(
+        stringr::str_length(correo_electronico) > 3 &
+            stringr::str_detect(correo_electronico, "Prueba", negate = TRUE) &
+            stringr::str_detect(nombre_completo_apellido_1,
+                "Prueba",
+                negate = TRUE
+            )
+    ) %>%
+    filter(
+        !is.na(
+            selecciona_la_opcion_que_mejor_te_representa_en_cada_enunciado_me_gusta_considerar_todas_las_alternativas_antes_de_tomar_una_decision
+        )
+    ) %>%
     select("respondent_id", 68:76)
 
-lf_decision <- readr::read_csv(path_lb_csv) %>%
+lf_decision <- readr::read_csv(path_lf_csv) %>%
     janitor::clean_names() %>%
     filter(
         stringr::str_length(correo_electronico) > 3 &
@@ -44,7 +57,7 @@ lf_decision <- readr::read_csv(path_lb_csv) %>%
             selecciona_la_opcion_que_mejor_te_representa_en_cada_enunciado_me_gusta_considerar_todas_las_alternativas_antes_de_tomar_una_decision
         )
     ) %>%
-    select("respondent_id", 68:76)
+    select("respondent_id", 78:86)
 
 lb_cats <-
     lb %>%
@@ -55,7 +68,9 @@ lb_cats <-
         "estado" = "q10_estado_donde_vives",
         "sede" = "q11_selecciona_tu_sede",
     ) %>%
-    mutate("nacional" = "Nacional")
+    mutate("nacional" = "Nacional") %>% 
+  filter(sexo != "Prueba") %>% 
+  mutate(sexo = stringr::str_replace(sexo, "Genero", "Género"))
 
 lf_cats <-
     lf %>%
@@ -70,6 +85,7 @@ lf_cats <-
 
 group_list <- list(
     "nacional" = "nacional",
+    "sexo" = "sexo",
     "edad" = "edad",
     "estado" = "estado",
     "sede" = "sede"
@@ -200,7 +216,7 @@ get_decision <- function(decision_df) {
     decision_wide <- decision_df %>%
         set_names(c(
             "respondent_id",
-            paste0(names(lb_decision[2:10]), "|", 1:9)
+            paste0(names(decision_df[2:10]), "|", 1:9)
         )) %>%
         pivot_longer(
             cols = 2:10,
@@ -228,7 +244,7 @@ get_decision <- function(decision_df) {
     return(decision_wide)
 }
 
-get_itemstats <- function(wide_question) {
+get_itemstats <- function(wide_question, type) {
     question_stats <- wide_question %>%
         select(-c("question")) %>%
         mutate(number = stringr::str_pad(number, width = 2, pad = "0")) %>%
@@ -271,21 +287,26 @@ get_itemstats <- function(wide_question) {
             "p_2",
             "p_3",
             "p_4"
-        )))
+        ))) %>%
+        mutate(type = type)
     return(question_itemstats)
 }
 
-scale_summary <- function(scale_df, data_cats, group) {
+scale_summary <- function(scale_df, data_cats, group, type) {
     label = unique(scale_df[["scale"]])
     df_cats <- inner_join(data_cats, scale_df, by = "respondent_id")
     number_of_items <- length(unique(df_cats$number))
 
     df_summary <- df_cats %>%
         summarise(
-            mean = mean(answer),
-            sd = sd(answer),
+            mean = mean(answer, na.rm = TRUE),
+            sd = sd(answer, na.rm = TRUE),
             n = n() / number_of_items,
             .by = c(group)
+        ) %>%
+        mutate(
+            se = sd / sqrt(n),
+            type = type
         ) %>%
         arrange(.data[[group]]) %>%
         mutate(
@@ -318,22 +339,22 @@ lb_agnc <-
     mutate(number = as.character(as.numeric(number) + 5)) %>%
     bind_rows(lb_ag_1) %>%
     arrange(respondent_id, number)
-lb_agnc_itemstats <- get_itemstats(lb_agnc)
-lb_team_itemstats <- get_itemstats(lb_team)
-lb_lead_itemstats <- get_itemstats(lb_lead)
-lb_empt_itemstats <- get_itemstats(lb_empt)
-lb_dcsn_itemstats <- get_itemstats(lb_dcsn)
+lb_agnc_itemstats <- get_itemstats(lb_agnc, "lb")
+lb_team_itemstats <- get_itemstats(lb_team, "lb")
+lb_lead_itemstats <- get_itemstats(lb_lead, "lb")
+lb_empt_itemstats <- get_itemstats(lb_empt, "lb")
+lb_dcsn_itemstats <- get_itemstats(lb_dcsn, "lb")
 
 lf_agnc <-
     lf_ag_2 %>%
     mutate(number = as.character(as.numeric(number) + 5)) %>%
     bind_rows(lf_ag_1) %>%
     arrange(respondent_id, number)
-lf_agnc_itemstats <- get_itemstats(lf_agnc)
-lf_team_itemstats <- get_itemstats(lf_team)
-lf_lead_itemstats <- get_itemstats(lf_lead)
-lf_empt_itemstats <- get_itemstats(lf_empt)
-lf_dcsn_itemstats <- get_itemstats(lf_dcsn)
+lf_agnc_itemstats <- get_itemstats(lf_agnc, "lf")
+lf_team_itemstats <- get_itemstats(lf_team, "lf")
+lf_lead_itemstats <- get_itemstats(lf_lead, "lf")
+lf_empt_itemstats <- get_itemstats(lf_empt, "lf")
+lf_dcsn_itemstats <- get_itemstats(lf_dcsn, "lf")
 
 # Grouped
 lb_itemstats_list <- list(
@@ -357,7 +378,7 @@ lf_itemstats_list <- list(
     "team" = lf_team_itemstats,
     "lead" = lf_lead_itemstats,
     "empt" = lf_empt_itemstats,
-    "dcsn" = lb_dcsn_itemstats
+    "dcsn" = lf_dcsn_itemstats
 )
 
 lf_scale_list <- list(
@@ -371,19 +392,22 @@ lf_scale_list <- list(
 lb_scale_summaries <-
     map(lb_scale_list, function(scale_x) {
         map(group_list, function(group_x) {
-            scale_summary(scale_x, lb_cats, group_x)
+            scale_summary(scale_x, lb_cats, group_x, "lb")
         })
     })
 
 lf_scale_summaries <-
     map(lf_scale_list, function(scale_x) {
         map(group_list, function(group_x) {
-            scale_summary(scale_x, lf_cats, group_x)
+            scale_summary(scale_x, lf_cats, group_x, "lf")
         })
     })
 
+ 
+
 # Export ----
-write_rds(lb_scale_list, paste0(output_path, "/lb-scales-mentores-25-26.rds"))
+map(lb_scale_list, ~mutate(.x, type = "lb")) %>% 
+  write_rds(paste0(output_path, "/lb-scales-mentores-25-26.rds"))
 write_rds(
     lb_itemstats_list,
     paste0(output_path, "/lb-psychometrics-mentores-25-26.rds")
@@ -393,8 +417,8 @@ write_rds(
     paste0(output_path, "/lb-statistics-mentores-25-26.rds")
 )
 
-
-write_rds(lf_scale_list, paste0(output_path, "/lf-scales-mentores-25-26.rds"))
+map(lf_scale_list, ~mutate(.x, type = "lf")) %>% 
+  write_rds(paste0(output_path, "/lf-scales-mentores-25-26.rds"))
 write_rds(
     lf_itemstats_list,
     paste0(output_path, "/lf-psychometrics-mentores-25-26.rds")
