@@ -1,3 +1,18 @@
+---
+title: "Scales - JAT - Línea Final Mentores 25-26"
+format:
+    docx:
+        df-print: kable
+        fig-format: png
+        out-widht: 80%
+        fig-dpi: 300 
+execute: 
+  echo: false
+  warning: false
+theme: journal
+---
+
+```{r setup}
 library(tidyverse)
 
 output_path <- "output/mentores 25-26"
@@ -9,7 +24,6 @@ lb_items <- read_rds(paste0(
 ))
 lb_summary <- read_rds(paste0(output_path, "/lb-statistics-mentores-25-26.rds"))
 
-lf_scales <- read_rds(paste0(output_path, "/lf-scales-mentores-25-26.rds"))
 lf_items <- read_rds(paste0(
     output_path,
     "/lf-psychometrics-mentores-25-26.rds"
@@ -80,4 +94,111 @@ claves <-
   mutate(number = stringr::str_pad(number, width = 2, pad = "0")) %>% 
   tidyr::unite("Item", scale, number, remove = FALSE) %>% 
   select("Scale" = "scale", "Item", "Question" = "question") %>% 
-  distinct()
+  distinct() %>% 
+  arrange(Item)
+```
+
+## Nacional 
+
+```{r}
+comp_summary[["nacional"]]
+```
+{{< pagebreak >}}
+
+## Sexo
+
+```{r}
+comp_summary[["sexo"]]
+```
+{{< pagebreak >}}
+
+## Edad
+
+```{r}
+comp_summary[["edad"]]
+```
+{{< pagebreak >}}
+
+## Estado
+
+```{r}
+comp_summary[["estado"]]
+```
+{{< pagebreak >}}
+
+## Sede
+
+```{r}
+comp_summary[["sede"]]
+```
+{{< pagebreak >}}
+
+## Agency
+
+```{r}
+comp_item[["agnc"]] %>% 
+    arrange(item)
+```
+\
+```{r}
+claves %>% 
+    filter(Scale == "Agency") %>% 
+    select(-Scale)
+```
+{{< pagebreak >}}
+
+## Teamwork
+
+```{r}
+comp_item[["team"]] %>% 
+    arrange(item)
+```
+\
+```{r}
+claves %>% 
+    filter(Scale == "Teamwork") %>% 
+    select(-Scale)
+```
+{{< pagebreak >}}
+
+## Leadership
+
+```{r}
+comp_item[["lead"]] %>% 
+    arrange(item)
+```
+\
+```{r}
+claves %>% 
+    filter(Scale == "Leadership") %>% 
+    select(-Scale)
+```
+{{< pagebreak >}}
+
+## Empathy
+
+```{r}
+comp_item[["empt"]] %>% 
+    arrange(item)
+```
+\
+```{r}
+claves %>% 
+    filter(Scale == "Empathy") %>% 
+    select(-Scale)
+```
+{{< pagebreak >}}
+
+## Decision
+
+```{r}
+comp_item[["dcsn"]] %>% 
+    arrange(item)
+```
+\
+```{r}
+claves %>% 
+    filter(Scale == "Decision") %>% 
+    select(-Scale)
+```
+{{< pagebreak >}}

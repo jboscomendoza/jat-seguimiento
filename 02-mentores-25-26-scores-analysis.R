@@ -24,24 +24,8 @@ lb <- readxl::read_excel(path_lb) %>%
 lf <- readxl::read_excel(path_lf) %>%
     janitor::clean_names()
 
-lb_decision <- readr::read_csv(path_lb_csv) %>%
-    janitor::clean_names() %>%
-    filter(
-        stringr::str_length(correo_electronico) > 3 &
-            stringr::str_detect(correo_electronico, "Prueba", negate = TRUE) &
-            stringr::str_detect(nombre_completo_apellido_1,
-                "Prueba",
-                negate = TRUE
-            )
-    ) %>%
-    filter(
-        !is.na(
-            selecciona_la_opcion_que_mejor_te_representa_en_cada_enunciado_me_gusta_considerar_todas_las_alternativas_antes_de_tomar_una_decision
-        )
-    ) %>%
-    select("respondent_id", 68:76)
-
-lf_decision <- readr::read_csv(path_lf_csv) %>%
+lb_decision <-
+    readr::read_csv(path_lb_csv) %>%
     janitor::clean_names() %>%
     filter(
         stringr::str_length(correo_electronico) > 3 &
@@ -57,6 +41,28 @@ lf_decision <- readr::read_csv(path_lf_csv) %>%
             selecciona_la_opcion_que_mejor_te_representa_en_cada_enunciado_me_gusta_considerar_todas_las_alternativas_antes_de_tomar_una_decision
         )
     ) %>%
+    select("respondent_id", 68:76)
+
+lf_decision <-
+    readr::read_csv(path_lf_csv) %>%
+    janitor::clean_names() %>%
+    filter(
+        stringr::str_length(correo_electronico) > 3 &
+            stringr::str_detect(correo_electronico, "Prueba", negate = TRUE) &
+            stringr::str_detect(
+                nombre_completo_apellido_1,
+                "Prueba",
+                negate = TRUE
+            )
+    ) %>%
+    filter(
+        !is.na(
+            selecciona_la_opcion_que_mejor_te_representa_en_cada_enunciado_me_gusta_considerar_todas_las_alternativas_antes_de_tomar_una_decision
+        )
+    ) %>%
+    group_by(correo_electronico) %>%
+    slice(1) %>%
+    ungroup() %>%
     select("respondent_id", 78:86)
 
 lb_cats <-
@@ -68,9 +74,9 @@ lb_cats <-
         "estado" = "q10_estado_donde_vives",
         "sede" = "q11_selecciona_tu_sede",
     ) %>%
-    mutate("nacional" = "Nacional") %>% 
-  filter(sexo != "Prueba") %>% 
-  mutate(sexo = stringr::str_replace(sexo, "Genero", "Género"))
+    mutate("nacional" = "Nacional") %>%
+    filter(sexo != "Prueba") %>%
+    mutate(sexo = stringr::str_replace(sexo, "Genero", "Género"))
 
 lf_cats <-
     lf %>%
@@ -332,7 +338,8 @@ lf_ag_2 <- widen_question(lf, "q15", "Agency", 5)
 lf_team <- widen_question(lf, "q29", "Teamwork", 9)
 lf_lead <- widen_question(lf, "q30", "Leadership", 7)
 lf_empt <- widen_question(lf, "q31", "Empathy", 5)
-lf_dcsn <- get_decision(lf_decision)
+lf_dcsn <- get_decision(lf_decision) %>%
+    mutate(answer = ifelse(is.na(answer), 4, answer))
 
 lb_agnc <-
     lb_ag_2 %>%
@@ -403,11 +410,10 @@ lf_scale_summaries <-
         })
     })
 
- 
 
 # Export ----
-map(lb_scale_list, ~mutate(.x, type = "lb")) %>% 
-  write_rds(paste0(output_path, "/lb-scales-mentores-25-26.rds"))
+map(lb_scale_list, ~ mutate(.x, type = "lb")) %>%
+    write_rds(paste0(output_path, "/lb-scales-mentores-25-26.rds"))
 write_rds(
     lb_itemstats_list,
     paste0(output_path, "/lb-psychometrics-mentores-25-26.rds")
@@ -417,8 +423,8 @@ write_rds(
     paste0(output_path, "/lb-statistics-mentores-25-26.rds")
 )
 
-map(lf_scale_list, ~mutate(.x, type = "lf")) %>% 
-  write_rds(paste0(output_path, "/lf-scales-mentores-25-26.rds"))
+map(lf_scale_list, ~ mutate(.x, type = "lf")) %>%
+    write_rds(paste0(output_path, "/lf-scales-mentores-25-26.rds"))
 write_rds(
     lf_itemstats_list,
     paste0(output_path, "/lf-psychometrics-mentores-25-26.rds")
