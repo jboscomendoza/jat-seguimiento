@@ -1,6 +1,35 @@
 library(tidyverse)
 library(janitor)
 
+items_to_reverse <- c(
+  "Teamwork_07",
+  "Empathy_02",
+  "Empathy_03",
+  "Empathy_04",
+  "Decision_06",
+  "Decision_07",
+  "Decision_08",
+  "Decision_09"
+)
+
+group_list <- list(
+  "nacional" = "nacional",
+  "sexo" = "sexo",
+  "edad" = "edad",
+  "estado" = "estado",
+  "sede" = "sede"
+)
+
+scale_names <- c(
+  "Agency" = "Agency",
+  "Teamwork" = "Teamwork",
+  "Leadership" = "Leadership",
+  "Empathy" = "Empathy",
+  "Decision" = "Decision"
+)
+
+type_names <- c("lb" = "lb", "lf" = "lf")
+
 
 # Functions ----
 recode_answer <- function(column) {
@@ -57,25 +86,6 @@ lf_cats <-
     sede = ifelse(is.na(sede), estado, sede),
     sexo = stringr::str_replace(sexo, "Otro.*", "Otro"),
   )
-
-items_to_reverse <- c(
-  "Teamwork_07",
-  "Empathy_02",
-  "Empathy_03",
-  "Empathy_04",
-  "Decision_06",
-  "Decision_07",
-  "Decision_08",
-  "Decision_09"
-)
-
-group_list <- list(
-  "nacional" = "nacional",
-  "sexo" = "sexo",
-  "edad" = "edad",
-  "estado" = "estado",
-  "sede" = "sede"
-)
 
 lb_scale_list <- list(
   "Agency" = list(
@@ -163,6 +173,34 @@ lf_scale_list <- list(
   )
 )
 
+items_clave <- map(lb_scale_list, function(list_x) {
+  lb %>%
+    slice(1) %>%
+    select(respondent_id, list_x[["item_index"]]) %>%
+    pivot_longer(
+      -respondent_id,
+      names_to = "question",
+      values_to = "answer"
+    ) %>%
+    select(-c(respondent_id, answer)) %>%
+    distinct() %>%
+    mutate(
+      item = paste0(
+        list_x[["name"]],
+        "_",
+        stringr::str_pad(row_number(), width = 2, pad = "0")
+      ),
+      question = stringr::str_remove(
+        question,
+        ".*(enunciado(s)?|representa)_"
+      ) %>%
+        stringr::str_replace_all("_", " ") %>%
+        stringr::str_to_sentence() %>%
+        stringr::str_squish()
+    ) %>%
+    select(item, question)
+})
+
 lb_stats <-
   map(lb_scale_list, function(list_x) {
     lb %>%
@@ -225,50 +263,130 @@ lf_scores <-
       inner_join(lf_cats, by = "respondent_id")
   })
 
-scale_names <- c(
-  "Agency" = "Agency",
-  "Teamwork" = "Teamwork",
-  "Leadership" = "Leadership",
-  "Empathy" = "Empathy",
-  "Decision" = "Decision"
-)
-
-type_names <- c("lb" = "lb", "lf" = "lf")
-
 scores_list <-
   list(
     "lb" = lb_scores,
     "lf" = lf_scores
   )
 
-map(group_list, function(group_x) {
-  map_df(scale_names, function(scale_x) {
-    map(type_names, function(type_x) {
-      scores_list[[type_x]][[scale_x]] %>%
-        summarise(
-          mean = mean(score, na.rm = TRUE),
-          sd = sd(score, na.rm = TRUE),
-          n = n(),
-          se = sd / sqrt(n),
-          .by = c(group_x)
+group_summary <-
+  map(group_list, function(group_x) {
+    map_df(scale_names, function(scale_x) {
+      map(type_names, function(type_x) {
+        scores_list[[type_x]][[scale_x]] %>%
+          summarise(
+            mean = mean(score, na.rm = TRUE),
+            sd = sd(score, na.rm = TRUE),
+            n = n(),
+            se = sd / sqrt(n),
+            .by = c(group_x)
+          ) %>%
+          mutate(
+            scale = scale_x,
+            type = type_x
+          ) %>%
+          arrange(.data[[group_x]])
+      }) %>%
+        reduce(
+          inner_join,
+          by = c("scale", group_x),
+          suffix = c("_lb", "_lf")
+        ) %>%
+        mutate(diferencia = mean_lf - mean_lb) %>%
+        select(
+          scale,
+          all_of(group_x),
+          starts_with("mean"),
+          diferencia,
+          starts_with("sd"),
+          starts_with("se"),
+          starts_with("n"),
+          -starts_with("type")
         ) %>%
         mutate(
-          scale = scale_x,
-          type = type_x
+          linf_lb = mean_lb - 1.96 * se_lb,
+          lsup_lb = mean_lb + 1.96 * se_lb,
+          linf_lf = mean_lf - 1.96 * se_lf,
+          lsup_lf = mean_lf + 1.96 * se_lf,
         ) %>%
-        arrange(.data[[group_x]])
-    }) %>% 
-      reduce(inner_join, by = c("scale", group_x), suffix = c("_lb", "_lf")) %>%
+        mutate(
+          test_a = dplyr::between(linf_lb, linf_lf, lsup_lf),
+          test_b = dplyr::between(lsup_lb, linf_lf, lsup_lf),
+          test_c = dplyr::between(lsup_lf, linf_lb, lsup_lb),
+          test_d = dplyr::between(lsup_lf, linf_lb, lsup_lb)
+        ) %>%
+        mutate(
+          sig = ifelse(test_a + test_b + test_c + test_d == 0, "*", "")
+        ) %>%
+        select(-starts_with("test_"))
+    })
+  })
+
+
+stats_list <-
+  list(
+    "lb" = lb_stats,
+    "lf" = lf_stats
+  )
+
+group_stats <-
+  map(scale_names, function(scale_x) {
+    map(type_names, function(type_x) {
+      question_stats <- stats_list[[type_x]][[scale_x]]
+
+      alpha_value = question_stats$overall$alpha
+
+      question_itemstats <- dplyr::bind_cols(
+        question_stats$itemstats,
+        question_stats$proportions
+      ) %>%
+        mutate(
+          alpha = alpha_value,
+          across(where(is.numeric), ~ round(.x, 2)),
+        ) %>%
+        rownames_to_column("item") %>%
+        as_tibble() %>%
+        select(all_of(c(
+          "item",
+          "N",
+          "mean",
+          "sd",
+          "alpha"
+        ))) %>%
+        mutate(se = sd / sqrt(N))
+    }) %>%
+      reduce(
+        inner_join,
+        by = "item",
+        suffix = c("_lb", "_lf")
+      ) %>%
       mutate(diferencia = mean_lf - mean_lb) %>%
       select(
-        scale,
-        all_of(group_x),
+        item,
         starts_with("mean"),
         diferencia,
         starts_with("sd"),
         starts_with("se"),
-        starts_with("n"),
+        starts_with("N"),
         -starts_with("type")
-       )
+      ) %>%
+      mutate(
+        linf_lb = mean_lb - 1.96 * se_lb,
+        lsup_lb = mean_lb + 1.96 * se_lb,
+        linf_lf = mean_lf - 1.96 * se_lf,
+        lsup_lf = mean_lf + 1.96 * se_lf,
+      ) %>%
+      mutate(
+        test_a = dplyr::between(linf_lb, linf_lf, lsup_lf),
+        test_b = dplyr::between(lsup_lb, linf_lf, lsup_lf),
+        test_c = dplyr::between(lsup_lf, linf_lb, lsup_lb),
+        test_d = dplyr::between(lsup_lf, linf_lb, lsup_lb)
+      ) %>%
+      mutate(
+        sig = ifelse(test_a + test_b + test_c + test_d == 0, "*", "")
+      ) %>%
+      select(-starts_with("test_"))
   })
-})
+
+readr::write_rds(group_stats, "output/mentores 25-26/group_stats.rds")
+readr::write_rds(group_summary, "output/mentores 25-26/group_summary.rds")
