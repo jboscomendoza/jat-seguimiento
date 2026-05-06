@@ -50,12 +50,18 @@ reverse_scale <- function(scale_values, max_value = 4) {
   return(reverse_values)
 }
 
+mentores_ids <- readr::read_csv(
+  file = "output/seguimiento/mentores-25-25-ids.csv"
+)
+
+
 lb <- readr::read_csv(file = "data/excel/LB Mentores 25-26 260505.csv") %>%
-  janitor::clean_names()
+  janitor::clean_names() %>%
+  filter(respondent_id %in% na.omit(mentores_ids$respondent_id_lb))
 
 lf <- readr::read_csv(file = "data/excel/LF Mentores 25-26 260505.csv") %>%
-  janitor::clean_names()
-
+  janitor::clean_names() %>%
+  filter(respondent_id %in% na.omit(mentores_ids$respondent_id_lf))
 
 lb_cats <-
   lb %>%
@@ -198,7 +204,7 @@ items_clave <- map(lb_scale_list, function(list_x) {
         stringr::str_to_sentence() %>%
         stringr::str_squish()
     ) %>%
-    select(item, question)
+    select("Item" = "item", "Question" = "question")
 })
 
 lb_stats <-
@@ -390,18 +396,87 @@ group_stats <-
 
 group_summary <- map(group_summary, function(df_x) {
   names(df_x) <- stringr::str_to_sentence(names(df_x))
-  df_x %>% 
-    mutate(across(where(is.numeric), ~round(.x, 2)))
+  df_x %>%
+    mutate(across(where(is.numeric), ~ round(.x, 2)))
 })
 
 group_stats <- map(group_stats, function(df_x) {
   names(df_x) <- stringr::str_to_sentence(names(df_x))
-  df_x %>% 
-    mutate(across(where(is.numeric), ~round(.x, 2)))
+  df_x %>%
+    mutate(across(where(is.numeric), ~ round(.x, 2)))
 })
 
 names(items_clave) <- stringr::str_to_sentence(names(items_clave))
 
+# Ganancia individual ----
+gains <- list()
+
+gains$df <- map_df(scale_names, function(scale_x) {
+  df_lb <- lb_scores[[scale_x]] %>%
+    select("respondent_id_lb" = respondent_id, "score_lb" = score)
+  df_lf <- lf_scores[[scale_x]] %>%
+    select("respondent_id_lf" = respondent_id, "score_lf" = score)
+  df_ids <- select(mentores_ids, starts_with("respondent"))
+  inner_join(
+    df_lb,
+    df_ids,
+    by = "respondent_id_lb"
+  ) %>%
+    inner_join(
+      df_lf,
+      by = "respondent_id_lf"
+    ) %>%
+    mutate(
+      scale = scale_x,
+      diferencia = score_lf - score_lb,
+      status = ifelse(diferencia > 0, "Con ganancia", "Sin ganancia")
+    )
+})
+
+gains$by_scale <-
+  gains$df %>%
+  group_by(scale) %>%
+  count(status) %>%
+  mutate(percent = round(n / sum(n) * 100, 2)) %>%
+  filter(status == "Con ganancia")
+
+gains$at_least_one <-
+  gains$df %>%
+  group_by(respondent_id_lb) %>%
+  count(status) %>%
+  pivot_wider(names_from = "status", values_from = "n") %>%
+  ungroup() %>%
+  rename("scales_with_gains" = "Con ganancia") %>%
+  count(scales_with_gains) %>%
+  mutate(
+    percent = round(n / sum(n) * 100, 2),
+    scales_with_gains = ifelse(is.na(scales_with_gains), 0, scales_with_gains)
+  )
+
+gains$cor_pre <-
+  gains$df %>%
+  select(scale, ends_with("_lb")) %>%
+  pivot_wider(names_from = "scale", values_from = score_lb) %>%
+  select(-c("respondent_id_lb")) %>%
+  cor(use = "pairwise") %>%
+  round(2) %>%
+  as.data.frame() %>%
+  rownames_to_column("scale") %>%
+  as_tibble()
+
+gains$cor_post <-
+  gains$df %>%
+  select(scale, ends_with("_lf")) %>%
+  pivot_wider(names_from = "scale", values_from = score_lf) %>%
+  select(-c("respondent_id_lf")) %>%
+  cor(use = "pairwise") %>%
+  round(2) %>%
+  as.data.frame() %>%
+  rownames_to_column("scale") %>%
+  as_tibble()
+
+# Exports ----
 readr::write_rds(group_stats, "output/mentores 25-26/group_stats.rds")
 readr::write_rds(group_summary, "output/mentores 25-26/group_summary.rds")
 readr::write_rds(items_clave, "output/mentores 25-26/items_clave.rds")
+readr::write_rds(gains, "output/mentores 25-26/gains.rds")
