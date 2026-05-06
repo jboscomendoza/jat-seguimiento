@@ -388,5 +388,20 @@ group_stats <-
       select(-starts_with("test_"))
   })
 
+group_summary <- map(group_summary, function(df_x) {
+  names(df_x) <- stringr::str_to_sentence(names(df_x))
+  df_x %>% 
+    mutate(across(where(is.numeric), ~round(.x, 2)))
+})
+
+group_stats <- map(group_stats, function(df_x) {
+  names(df_x) <- stringr::str_to_sentence(names(df_x))
+  df_x %>% 
+    mutate(across(where(is.numeric), ~round(.x, 2)))
+})
+
+names(items_clave) <- stringr::str_to_sentence(names(items_clave))
+
 readr::write_rds(group_stats, "output/mentores 25-26/group_stats.rds")
 readr::write_rds(group_summary, "output/mentores 25-26/group_summary.rds")
+readr::write_rds(items_clave, "output/mentores 25-26/items_clave.rds")

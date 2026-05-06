@@ -1,0 +1,113 @@
+---
+title: "Scales - JAT - Línea Final Mentores 25-26"
+format:
+    docx:
+        df-print: kable
+        fig-format: png
+        out-widht: 80%
+        fig-dpi: 300 
+execute: 
+  echo: false
+  warning: false
+theme: journal
+---
+
+```{r setup}
+library(tidyverse)
+
+output_path <- "output/mentores 25-26"
+
+comb_item <- read_rds(paste0(output_path, "/group_stats.rds"))
+comb_summary <- read_rds(paste0(output_path, "/group_summary.rds"))
+claves <- read_rds(paste0(output_path, "/items_clave.rds"))
+```
+
+## Nacional 
+
+```{r}
+comb_summary[["nacional"]]
+```
+{{< pagebreak >}}
+
+## Sexo
+
+```{r}
+comb_summary[["sexo"]]
+```
+{{< pagebreak >}}
+
+## Edad
+
+```{r}
+comb_summary[["edad"]]
+```
+{{< pagebreak >}}
+
+## Estado
+
+```{r}
+comb_summary[["estado"]]
+```
+{{< pagebreak >}}
+
+## Sede
+
+```{r}
+comb_summary[["sede"]]
+```
+{{< pagebreak >}}
+
+## Agency
+
+```{r}
+comb_item[["Agency"]]
+```
+\
+```{r}
+claves[["Agency"]]
+```
+{{< pagebreak >}}
+
+## Teamwork
+
+```{r}
+comb_item[["Teamwork"]]
+```
+\
+```{r}
+claves[["Teamwork"]]
+```
+{{< pagebreak >}}
+
+## Leadership
+
+```{r}
+comb_item[["Leadership"]]
+```
+\
+```{r}
+claves[["Leadership"]]
+```
+{{< pagebreak >}}
+
+## Empathy
+
+```{r}
+comb_item[["Empathy"]]
+```
+\
+```{r}
+claves[["Empathy"]]
+```
+{{< pagebreak >}}
+
+## Decision
+
+```{r}
+comb_item[["Decision"]]
+```
+\
+```{r}
+claves[["Decision"]]
+```
+{{< pagebreak >}}
