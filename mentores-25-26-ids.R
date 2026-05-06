@@ -3,8 +3,8 @@ library(openxlsx)
 library(stringi)
 library(tidyverse)
 
-lb_path = "data/excel/LB-Mentores-JAT-25-26.csv"
-lf_path = "data/excel/LF-Mentores-JAT-25-26.csv"
+lb_path = "data/excel/LB Mentores 25-26 260505.csv"
+lf_path = "data/excel/LF Mentores 25-26 260505.csv"
 
 cols_id <- c(
     "nombre" = "nombre_completo_nombre",
@@ -16,7 +16,9 @@ cols_id <- c(
     "edad" = "edad_anos_cumplidos",
     "sexo",
     "estado" = "estado_donde_vives",
-    "sede" = "selecciona_tu_sede"
+    "sede" = "selecciona_tu_sede",
+    "respondent_id",
+    "last_update_date"
 )
 
 reemplazos_nombres <-
@@ -113,14 +115,34 @@ lb_mentores <- read_csv(lb_path) %>%
     janitor::clean_names() %>%
     select(all_of(cols_id)) %>%
     text_cleaning() %>%
-    mutate(inicia = TRUE)
+    mutate(
+        inicia = TRUE,
+        respondent_id = as.character(respondent_id)
+    ) %>%
+    rename("respondent_id_lb" = "respondent_id") %>%
+    group_by(nombre_completo) %>%
+    arrange(nombre_completo) %>%
+    filter(last_update_date == max(last_update_date)) %>%
+    ungroup()
 
 lf_mentores <- read_csv(lf_path) %>%
     janitor::clean_names() %>%
     select("id", all_of(cols_id)) %>%
     text_cleaning() %>%
-    mutate(concluye = TRUE)
+    mutate(
+        concluye = TRUE,
+        respondent_id = as.character(respondent_id)
+    ) %>%
+    rename("respondent_id_lf" = "respondent_id") %>%
+    group_by(nombre_completo) %>%
+    arrange(nombre_completo) %>%
+    filter(last_update_date == max(last_update_date)) %>%
+    ungroup()
 
+lb_respondent <- select(lb_mentores, c("nombre_completo", "respondent_id_lb"))
+lf_respondent <- select(lf_mentores, c("nombre_completo", "respondent_id_lf"))
+lb_mentores <- select(lb_mentores, -c("respondent_id_lb", "last_update_date"))
+lf_mentores <- select(lf_mentores, -c("respondent_id_lf", "last_update_date"))
 
 mentores_ids <-
     full_join(
@@ -147,5 +169,12 @@ mentores_ids <-
         )
     ) %>%
     distinct()
+
+mentores_ids <-
+    reduce(
+        list(mentores_ids, lb_respondent, lf_respondent),
+        ~ left_join(.x, .y, by = "nombre_completo")
+    ) %>% 
+  distinct()
 
 write_csv(mentores_ids, "output/seguimiento/mentores-25-25-ids.csv")
